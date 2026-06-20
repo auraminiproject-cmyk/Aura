@@ -45,30 +45,44 @@ async def complete(
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
 
-    # Tier 1 — LiteLLM Proxy (local Docker only)
-    if settings.litellm_proxy_url and settings.app_env != "production":
-        try:
-            return await _litellm_complete(messages, model=chosen, temperature=temperature)
-        except Exception as exc:
-            logger.warning("LiteLLM proxy unavailable: %s — falling through", exc)
+    # Langfuse observability (no-op if not configured)
+    from services.api.core.langfuse_client import LLMTrace
 
-    # Tier 2 — Groq Direct (production primary)
-    if settings.groq_api_key and chosen.startswith("groq/"):
+    with LLMTrace("llm_complete", model=chosen) as trace:
+        trace.set_input(prompt[:500] if prompt else str(messages)[:500])
+
+        # Tier 1 — LiteLLM Proxy (local Docker only)
+        if settings.litellm_proxy_url and settings.app_env != "production":
+            try:
+                result = await _litellm_complete(messages, model=chosen, temperature=temperature)
+                trace.set_output(result[:500])
+                return result
+            except Exception as exc:
+                logger.warning("LiteLLM proxy unavailable: %s — falling through", exc)
+
+        # Tier 2 — Groq Direct (production primary)
+        if settings.groq_api_key and chosen.startswith("groq/"):
+            try:
+                result = await _groq_complete(
+                    messages, model=chosen.replace("groq/", ""), temperature=temperature,
+                )
+                trace.set_output(result[:500])
+                return result
+            except Exception:
+                pass  # already logged inside _groq_complete
+
+        # Tier 3 — Ollama (local fallback)
         try:
-            return await _groq_complete(
-                messages, model=chosen.replace("groq/", ""), temperature=temperature,
-            )
+            result = await _ollama_complete(prompt, system=system, temperature=temperature)
+            trace.set_output(result[:500])
+            return result
         except Exception:
-            pass  # already logged inside _groq_complete
+            pass
 
-    # Tier 3 — Ollama (local fallback)
-    try:
-        return await _ollama_complete(prompt, system=system, temperature=temperature)
-    except Exception:
-        pass
-
-    # Tier 4 — Offline heuristic
-    return _offline_fallback(prompt)
+        # Tier 4 — Offline heuristic
+        result = _offline_fallback(prompt)
+        trace.set_output(result[:500])
+        return result
 
 
 async def _litellm_complete(

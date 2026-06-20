@@ -6,19 +6,27 @@ from services.agent.llm import complete
 from services.agent.schemas import AgentState, DesignParams
 
 INTENT_KEYWORDS = {
-    "design_request": ["wedding", "saree", "lehenga", "outfit", "dress", "wear", "పెళ్ళి", "అమ్మాయి"],
-    "product_search": ["buy", "shop", "price", "myntra", "ajio", "కొను"],
-    "tailoring": ["stitch", "tailor", "fabric", "yard", "సెల్వి"],
-    "wardrobe": ["wardrobe", "closet", "saved", "collection"],
-    "greeting": ["hello", "hi", "namaste", "నమస్కారం", "hey"],
+    # Check specific intents FIRST (before broad design_request)
+    "product_search": ["buy", "shop", "price", "myntra", "ajio", "amazon", "nalli", "manyavar", "కొను", "कीमत", "खरीद", "sale"],
+    "tailoring": ["stitch", "tailor", "fabric", "yard", "measurement", "సెల్వి", "सिलाई", "दर्जी"],
+    "wardrobe": ["wardrobe", "closet", "saved", "collection", "capsule"],
+    "greeting": ["hello", "hi", "namaste", "నమస్కారం", "hey", "नमस्ते"],
+    # Broad design intent checked LAST among specific intents
+    "design_request": ["wedding", "saree", "lehenga", "outfit", "dress", "wear", "kurta", "sherwani", "పెళ్ళి", "అమ్మాయి", "शादी", "लहंगा"],
 }
 
 
 def classify_intent(message: str) -> str:
     lower = message.lower()
     for intent, keywords in INTENT_KEYWORDS.items():
-        if any(k in lower for k in keywords):
-            return intent
+        for k in keywords:
+            # Short keywords (<=3 chars) need word boundary matching
+            if len(k) <= 3:
+                if re.search(rf"\b{re.escape(k)}\b", lower):
+                    return intent
+            else:
+                if k in lower:
+                    return intent
     return "general"
 
 

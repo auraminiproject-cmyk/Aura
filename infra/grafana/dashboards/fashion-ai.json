@@ -1,7 +1,113 @@
 {
-  "title": "Fashion AI — System Health",
-  "panels": [
-    {"title": "API Health", "type": "stat", "targets": [{"expr": "up{job=\"fashion-api\"}"}]},
-    {"title": "Request Rate", "type": "graph", "targets": [{"expr": "rate(http_requests_total[5m])"}]}
-  ]
+  "dashboard": {
+    "id": null,
+    "uid": "fashion-ai-system",
+    "title": "AURA Fashion AI — System Health",
+    "tags": ["fashion-ai", "production"],
+    "timezone": "Asia/Kolkata",
+    "refresh": "30s",
+    "time": {"from": "now-1h", "to": "now"},
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Uptime",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [{"expr": "up{job=\"fashion-api\"}", "legendFormat": "API"}],
+        "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"1": {"text": "UP", "color": "green"}, "0": {"text": "DOWN", "color": "red"}}}]}}
+      },
+      {
+        "id": 2,
+        "title": "Request Rate (req/s)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0},
+        "targets": [
+          {"expr": "rate(http_requests_total{job=\"fashion-api\"}[5m])", "legendFormat": "{{method}} {{handler}}"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Request Latency P50/P95/P99 (ms)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"fashion-api\"}[5m])) * 1000", "legendFormat": "P50"},
+          {"expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"fashion-api\"}[5m])) * 1000", "legendFormat": "P95"},
+          {"expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{job=\"fashion-api\"}[5m])) * 1000", "legendFormat": "P99"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Error Rate (5xx/s)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {"expr": "rate(http_requests_total{job=\"fashion-api\", status=~\"5..\"}[5m])", "legendFormat": "5xx errors"}
+        ],
+        "fieldConfig": {"defaults": {"color": {"mode": "fixed", "fixedColor": "red"}}}
+      },
+      {
+        "id": 5,
+        "title": "LLM Provider Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 4},
+        "targets": [
+          {"expr": "fashion_ai_circuit_breaker_state{provider=\"groq\"}", "legendFormat": "Groq"},
+          {"expr": "fashion_ai_circuit_breaker_state{provider=\"huggingface\"}", "legendFormat": "HF"},
+          {"expr": "fashion_ai_circuit_breaker_state{provider=\"qdrant\"}", "legendFormat": "Qdrant"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Active WebSocket Connections",
+        "type": "gauge",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "targets": [{"expr": "fashion_ai_websocket_connections_active", "legendFormat": "Active"}]
+      },
+      {
+        "id": 7,
+        "title": "Chat Messages / min",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "targets": [
+          {"expr": "rate(fashion_ai_chat_messages_total[5m]) * 60", "legendFormat": "{{intent}}"}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "LLM Latency by Provider (ms)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, rate(fashion_ai_llm_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P50 {{provider}}"},
+          {"expr": "histogram_quantile(0.95, rate(fashion_ai_llm_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P95 {{provider}}"}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Memory Usage (MB)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "targets": [
+          {"expr": "process_resident_memory_bytes{job=\"fashion-api\"} / 1024 / 1024", "legendFormat": "RSS MB"}
+        ],
+        "fieldConfig": {"defaults": {"thresholds": {"steps": [{"value": 0, "color": "green"}, {"value": 400, "color": "yellow"}, {"value": 480, "color": "red"}]}}}
+      },
+      {
+        "id": 10,
+        "title": "Product Search Latency (ms)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, rate(fashion_ai_search_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P50"},
+          {"expr": "histogram_quantile(0.95, rate(fashion_ai_search_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P95"}
+        ]
+      }
+    ],
+    "templating": {"list": []},
+    "annotations": {"list": []},
+    "schemaVersion": 39,
+    "version": 1
+  },
+  "overwrite": true
 }
