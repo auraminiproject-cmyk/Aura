@@ -1,0 +1,66 @@
+# Environment
+.env
+.env.local
+.env.*.local
+*.pem
+secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Flutter / Dart
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+apps/mobile/**/Generated.xcconfig
+apps/mobile/**/flutter_export_environment.sh
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local object storage (replaces Cloudflare R2)
+storage/
+
+# Docker / data
+postgres_data/
+qdrant_data/
+ollama_data/
+minio_data/
+*.log
+
+# ML / training artifacts
+models/checkpoints/
+models/exports/
+data/raw/**/*.jpg
+data/raw/**/*.png
+!data/raw/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# CI artifacts
+*.apk
+*.aab
+*.ipa

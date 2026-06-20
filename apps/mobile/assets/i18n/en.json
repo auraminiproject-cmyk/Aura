@@ -1,0 +1,73 @@
+{
+  "app": {
+    "title": "AURA Fashion AI",
+    "tagline": "Your Personal AI Fashion Stylist"
+  },
+  "home": {
+    "greeting": "Hello, {name}!",
+    "subtitle": "What would you like to design today?",
+    "chat_card": "Chat with Stylist",
+    "design_card": "Design Outfit",
+    "wardrobe_card": "My Wardrobe",
+    "avatar_card": "Body Setup",
+    "trending": "Trending Now"
+  },
+  "chat": {
+    "title": "Fashion Chat",
+    "placeholder": "Describe your outfit idea...",
+    "voice_hint": "Tap to speak",
+    "send": "Send",
+    "listening": "Listening..."
+  },
+  "design": {
+    "title": "Design Studio",
+    "brief_label": "Describe your dream outfit",
+    "brief_hint": "e.g., Red silk lehenga for wedding, budget 5000",
+    "generate": "Generate Designs",
+    "generating": "AI is designing...",
+    "variants": "Design Variants",
+    "try_on": "Try On",
+    "save": "Save to Wardrobe",
+    "analyze": "Analyze Photo"
+  },
+  "wardrobe": {
+    "title": "My Wardrobe",
+    "my_closet": "My Closet",
+    "ai_closet": "AI Suggestions",
+    "add_item": "Add Item",
+    "empty": "Your wardrobe is empty. Start adding items!",
+    "suggest": "Get AI Suggestions"
+  },
+  "avatar": {
+    "title": "Body Setup",
+    "capture_front": "Take Front Photo",
+    "capture_side": "Take Side Photo",
+    "gallery": "Choose from Gallery",
+    "analyzing": "Analyzing body shape...",
+    "measurements": "Your Measurements",
+    "manual_entry": "Enter Manually",
+    "height": "Height (cm)",
+    "chest": "Chest (cm)",
+    "waist": "Waist (cm)",
+    "hip": "Hip (cm)"
+  },
+  "profile": {
+    "title": "Profile",
+    "edit": "Edit Profile",
+    "language": "Language",
+    "logout": "Logout",
+    "about": "About AURA",
+    "privacy": "Privacy Policy",
+    "export_data": "Export My Data"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "search": "Search",
+    "offline": "You're offline. Some features may be limited."
+  }
+}

@@ -1,0 +1,9 @@
+# Unsloth QLoRA — Qwen2.5-VL-7B (run on Colab T4, free)
+model_name: Qwen/Qwen2.5-VL-7B-Instruct
+method: qlora
+lora_rank: 64
+lora_alpha: 128
+learning_rate: 2.0e-4
+epochs: 3
+dataset: data/processed/fashion_vlm_sharegpt.json
+output_dir: models/checkpoints/fashion-vlm

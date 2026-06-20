@@ -1,0 +1,24 @@
+model_list:
+  - model_name: groq-primary
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: groq-fast
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+  - model_name: ollama-fallback
+    litellm_params:
+      model: ollama/llama3.2
+      api_base: http://ollama:11434
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 3
+  timeout: 30
+  fallbacks:
+    - groq-primary: [ollama-fallback]
+    - groq-fast: [ollama-fallback]
+
+general_settings:
+  master_key: sk-fashion-ai-local

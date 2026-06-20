@@ -1,0 +1,23 @@
+name: Weekly Retrain Check
+
+on:
+  schedule:
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+jobs:
+  retrain-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Data cleaning check
+        run: python -c "from data.cleaning_pipeline import DataCleaningPipeline; print(DataCleaningPipeline().clean_text_dataset([{'instruction':'hi','output':'hello world test'}]))"
+      - name: Regression eval
+        env:
+          PYTHONPATH: .
+          DATABASE_URL: sqlite+aiosqlite:///:memory:
+        run: python evals/run_eval.py

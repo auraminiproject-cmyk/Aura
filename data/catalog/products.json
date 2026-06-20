@@ -1,0 +1,12 @@
+[
+  {"id": "p1", "name": "Red Banarasi Silk Saree", "price_inr": 4999, "platform": "Myntra", "category": "saree", "color": "red", "brand": "EthnicRoots", "affiliate_url": "https://www.myntra.com/"},
+  {"id": "p2", "name": "Gold Embroidered Lehenga", "price_inr": 4799, "platform": "AJIO", "category": "lehenga", "color": "gold", "brand": "Manyavar", "affiliate_url": "https://www.ajio.com/"},
+  {"id": "p3", "name": "Maroon Anarkali Kurti Set", "price_inr": 2499, "platform": "Amazon Fashion", "category": "kurti", "color": "maroon", "brand": "Biba", "affiliate_url": "https://www.amazon.in/"},
+  {"id": "p4", "name": "Green Silk Saree Festival", "price_inr": 3299, "platform": "Myntra", "category": "saree", "color": "green", "brand": "Sabyasachi-inspired", "affiliate_url": "https://www.myntra.com/"},
+  {"id": "p5", "name": "Blue Cotton Kurta Men", "price_inr": 1899, "platform": "AJIO", "category": "kurta", "color": "blue", "brand": "Raymond", "affiliate_url": "https://www.ajio.com/"},
+  {"id": "p6", "name": "Pink Party Lehenga", "price_inr": 5599, "platform": "Myntra", "category": "lehenga", "color": "pink", "brand": "FabIndia", "affiliate_url": "https://www.myntra.com/"},
+  {"id": "p7", "name": "White Wedding Sherwani", "price_inr": 8999, "platform": "Amazon Fashion", "category": "sherwani", "color": "white", "brand": "Manyavar", "affiliate_url": "https://www.amazon.in/"},
+  {"id": "p8", "name": "Black Indo-Western Gown", "price_inr": 3999, "platform": "Myntra", "category": "indo-western", "color": "black", "brand": "Global Desi", "affiliate_url": "https://www.myntra.com/"},
+  {"id": "p9", "name": "Yellow Haldi Lehenga", "price_inr": 4299, "platform": "AJIO", "category": "lehenga", "color": "gold", "brand": "W for Woman", "affiliate_url": "https://www.ajio.com/"},
+  {"id": "p10", "name": "Telugu Wedding Silk Saree", "price_inr": 5999, "platform": "Myntra", "category": "saree", "color": "red", "brand": "Kalamandir", "affiliate_url": "https://www.myntra.com/"}
+]

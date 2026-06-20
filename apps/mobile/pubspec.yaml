@@ -1,0 +1,42 @@
+name: fashion_ai
+description: AI-Powered Personal Fashion Designer
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^2.6.1
+  dio: ^5.7.0
+  web_socket_channel: ^3.0.1
+  camera: ^0.11.0+2
+  image_picker: ^1.1.2
+  record: ^7.1.0
+  audioplayers: ^6.1.0
+  drift: ^2.22.1
+  sqlite3_flutter_libs: ^0.5.28
+  path_provider: ^2.1.5
+  path: ^1.9.0
+  flutter_i18n: ^0.36.2
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.3.3
+  model_viewer_plus: ^1.8.0
+  intl: ^0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  drift_dev: ^2.22.1
+  build_runner: ^2.4.13
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/i18n/

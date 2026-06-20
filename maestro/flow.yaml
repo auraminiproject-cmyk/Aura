@@ -1,0 +1,9 @@
+# Maestro E2E — run: maestro test maestro/flow.yaml
+appId: com.example.fashion_ai
+---
+- launchApp
+- tapOn: "Fashion Stylist"
+- tapOn: "Wedding ki outfit"
+- inputText: "red lehenga budget 5000"
+- tapOn: "Send"
+- assertVisible: "outfit"

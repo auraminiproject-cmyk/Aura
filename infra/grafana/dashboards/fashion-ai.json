@@ -1,0 +1,7 @@
+{
+  "title": "Fashion AI — System Health",
+  "panels": [
+    {"title": "API Health", "type": "stat", "targets": [{"expr": "up{job=\"fashion-api\"}"}]},
+    {"title": "Request Rate", "type": "graph", "targets": [{"expr": "rate(http_requests_total[5m])"}]}
+  ]
+}

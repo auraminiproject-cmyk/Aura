@@ -1,0 +1,1 @@
+"""Fashion AI FastAPI application."""
