@@ -1,6 +1,7 @@
 version: "3.8"
 
 services:
+  # ── Core API ─────────────────────────────────────────────────────────
   api:
     build:
       context: .
@@ -13,14 +14,22 @@ services:
       - ./services/vision:/app/services/vision
       - ./services/retrieval:/app/services/retrieval
       - ./services/wardrobe:/app/services/wardrobe
+      - ./data:/app/data
+      - storage_data:/app/storage
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/fashionai
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       OLLAMA_BASE_URL: http://ollama:11434
+      LITELLM_PROXY_URL: http://litellm:4000
       S3_ENDPOINT: http://minio:9000
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
+      POSTHOG_API_KEY: ${POSTHOG_API_KEY:-}
+      APP_ENV: development
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,6 +43,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # ── Celery Worker (DLQ-enabled task processing) ────────────────────
+  celery-worker:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    command: celery -A services.api.tasks.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - ./services:/app/services
+      - ./data:/app/data
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/fashionai
+      REDIS_URL: redis://redis:6379/0
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
+    depends_on:
+      - redis
+      - api
+
+  # ── LiteLLM Proxy (unified LLM routing) ───────────────────────────
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     ports:
@@ -46,6 +74,7 @@ services:
     depends_on:
       - ollama
 
+  # ── Data Stores ────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     ports:
@@ -65,6 +94,9 @@ services:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -73,6 +105,7 @@ services:
     volumes:
       - qdrant_data:/qdrant/storage
 
+  # ── AI / ML ────────────────────────────────────────────────────────
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -80,7 +113,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
 
-  # S3-compatible storage (replaces Cloudflare R2 — no card). Set STORAGE_BACKEND=minio
+  # ── Object Storage (S3-compatible, replaces R2 — no card needed) ──
   minio:
     image: minio/minio:latest
     ports:
@@ -93,6 +126,7 @@ services:
     volumes:
       - minio_data:/data
 
+  # ── Observability ──────────────────────────────────────────────────
   prometheus:
     image: prom/prometheus:latest
     ports:
@@ -104,11 +138,18 @@ services:
     image: grafana/grafana:latest
     ports:
       - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/fashion-ai.json
+    volumes:
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
 
 volumes:
   postgres_data: {}
+  redis_data: {}
   qdrant_data: {}
   ollama_data: {}
   minio_data: {}
+  storage_data: {}

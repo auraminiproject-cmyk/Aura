@@ -1,7 +1,9 @@
-# OPTIONAL — Render free tier may change card requirements. Prefer deploy/huggingface/ (no card).
+# Render Blueprint — AURA Fashion AI
+# Supports canary deployment via preview environments
 # See docs/FREE_STACK.md before using.
 
 services:
+  # ── Production API ─────────────────────────────────────────────────
   - type: web
     name: fashion-ai-api
     runtime: docker
@@ -9,6 +11,8 @@ services:
     dockerContext: .
     plan: free
     healthCheckPath: /health
+    autoDeploy: true
+    branch: main
     envVars:
       - key: DATABASE_URL
         value: sqlite+aiosqlite:///./fashionai.db
@@ -26,3 +30,21 @@ services:
         generateValue: true
       - key: APP_ENV
         value: production
+      - key: REDIS_URL
+        value: redis://red-placeholder:6379/0
+
+  # ── Canary API (preview environment) ───────────────────────────────
+  # Render auto-creates preview environments for PRs.
+  # This config ensures preview uses the same Dockerfile but
+  # with APP_ENV=canary and separate DB for safe testing.
+
+previews:
+  generation: automatic
+  startCommand: null
+  envVars:
+    - key: APP_ENV
+      value: canary
+    - key: DATABASE_URL
+      value: sqlite+aiosqlite:///./fashionai_canary.db
+    - key: APP_SECRET_KEY
+      generateValue: true
