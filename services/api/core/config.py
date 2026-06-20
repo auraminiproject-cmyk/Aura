@@ -52,6 +52,22 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_bucket: str = "fashion-ai"
 
+    # Observability — Langfuse (free: 50K observations/month)
+    langfuse_public_key: str = ""
+    langfuse_secret_key: str = ""
+    langfuse_host: str = "https://cloud.langfuse.com"
+
+    # Analytics — PostHog (free: 1M events/month)
+    posthog_api_key: str = ""
+    posthog_host: str = "https://app.posthog.com"
+
+    # Push Notifications — Firebase
+    firebase_server_key: str = ""
+
+    # VLM models
+    vlm_primary_model: str = "llama-3.2-90b-vision-preview"
+    vlm_fallback_model: str = "Qwen/Qwen2.5-VL-7B-Instruct"
+
     @property
     def cors_origin_list(self) -> List[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
