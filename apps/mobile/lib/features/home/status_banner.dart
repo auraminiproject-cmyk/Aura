@@ -12,25 +12,26 @@ class StatusBanner extends ConsumerWidget {
     ref.watch(initApiProvider);
     final connState = ref.watch(connectionStateProvider);
 
-    final (Color bg, Color fg, String label, IconData icon) = switch (connState) {
-      AppConnectionState.online => (
-          const Color(0xFF1B5E20),
-          Colors.white,
-          'Online — Fashion AI ready',
-          Icons.cloud_done,
-        ),
+    // Only show banner when NOT online (keep UI clean when connected)
+    if (connState == AppConnectionState.online) {
+      return const SizedBox.shrink();
+    }
+
+    final (Color accent, String label, IconData icon, bool showSpinner) =
+        switch (connState) {
       AppConnectionState.connecting => (
-          const Color(0xFFF57F17),
-          Colors.black87,
-          'Connecting to server…',
+          const Color(0xFFD4AF37),
+          'Connecting to AURA server…',
           Icons.sync,
+          true,
         ),
       AppConnectionState.offline => (
-          const Color(0xFFB71C1C),
-          Colors.white,
-          'Offline — tap to retry',
-          Icons.cloud_off,
+          const Color(0xFFEF5350),
+          'Offline — tap to reconnect',
+          Icons.cloud_off_outlined,
+          false,
         ),
+      _ => (Colors.grey, '', Icons.info, false),
     };
 
     return GestureDetector(
@@ -41,38 +42,39 @@ class StatusBanner extends ConsumerWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: bg,
-          boxShadow: [
-            BoxShadow(
-              color: bg.withValues(alpha: 0.3),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: accent.withValues(alpha: 0.1),
+          border: Border(
+            bottom: BorderSide(color: accent.withValues(alpha: 0.2)),
+          ),
         ),
         child: SafeArea(
           bottom: false,
           child: Row(
             children: [
-              Icon(icon, color: fg, size: 18),
+              Icon(icon, color: accent, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   label,
-                  style: TextStyle(color: fg, fontWeight: FontWeight.w500, fontSize: 13),
+                  style: TextStyle(
+                    color: accent,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 12,
+                    letterSpacing: 0.3,
+                  ),
                 ),
               ),
-              if (connState == AppConnectionState.connecting)
+              if (showSpinner)
                 SizedBox(
-                  width: 16,
-                  height: 16,
+                  width: 14,
+                  height: 14,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: fg,
+                    strokeWidth: 1.5,
+                    color: accent,
                   ),
                 ),
               if (connState == AppConnectionState.offline)
-                Icon(Icons.refresh, color: fg, size: 18),
+                Icon(Icons.refresh, color: accent, size: 16),
             ],
           ),
         ),

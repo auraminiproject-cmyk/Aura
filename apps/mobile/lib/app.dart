@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_i18n/flutter_i18n.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/aura_background.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/home/status_banner.dart';
 import 'features/avatar/avatar_capture_screen.dart';
@@ -15,13 +17,18 @@ class FashionAiApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Force dark status bar icons on dark background
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF121218),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ));
+
     return MaterialApp(
       title: 'AURA Fashion AI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF8B1538)),
-        useMaterial3: true,
-      ),
+      theme: AuraTheme.darkTheme,
       localizationsDelegates: [
         FlutterI18nDelegate(
           translationLoader: FileTranslationLoader(
@@ -58,11 +65,11 @@ class _MainShellState extends State<MainShell> {
   int _index = 0;
 
   static const _tabs = [
-    ('Chat', Icons.chat_bubble_outline),
-    ('Avatar', Icons.face_retouching_natural),
-    ('Design', Icons.brush_outlined),
-    ('Shop', Icons.shopping_bag_outlined),
-    ('Wardrobe', Icons.checkroom_outlined),
+    ('Chat', Icons.auto_awesome, Icons.auto_awesome_outlined),
+    ('Avatar', Icons.face_retouching_natural, Icons.face_retouching_natural_outlined),
+    ('Design', Icons.brush, Icons.brush_outlined),
+    ('Shop', Icons.shopping_bag, Icons.shopping_bag_outlined),
+    ('Wardrobe', Icons.checkroom, Icons.checkroom_outlined),
   ];
 
   @override
@@ -75,20 +82,36 @@ class _MainShellState extends State<MainShell> {
       const WardrobeScreen(),
     ];
 
-    return Scaffold(
-      body: Column(
-        children: [
-          const StatusBanner(),
-          Expanded(child: screens[_index]),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: [
-          for (final t in _tabs)
-            NavigationDestination(icon: Icon(t.$2), label: t.$1),
-        ],
+    return AuraBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Column(
+          children: [
+            const StatusBanner(),
+            Expanded(child: screens[_index]),
+          ],
+        ),
+        bottomNavigationBar: Container(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.06),
+              ),
+            ),
+          ),
+          child: NavigationBar(
+            selectedIndex: _index,
+            onDestinationSelected: (i) => setState(() => _index = i),
+            destinations: [
+              for (final t in _tabs)
+                NavigationDestination(
+                  icon: Icon(t.$3),
+                  selectedIcon: Icon(t.$2),
+                  label: t.$1,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

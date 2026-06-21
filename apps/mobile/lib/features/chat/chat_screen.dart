@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import '../../core/api_provider.dart';
+import '../../core/aura_background.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -13,7 +14,8 @@ class ChatScreen extends ConsumerStatefulWidget {
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends ConsumerState<ChatScreen> {
+class _ChatScreenState extends ConsumerState<ChatScreen>
+    with SingleTickerProviderStateMixin {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <Map<String, String>>[];
@@ -21,12 +23,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   bool _loading = false;
   bool _recording = false;
   final _recorder = AudioRecorder();
+  late final AnimationController _typingCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _typingCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
     _recorder.dispose();
+    _typingCtrl.dispose();
     super.dispose();
   }
 
@@ -48,7 +61,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final connState = ref.read(connectionStateProvider);
     if (connState != AppConnectionState.online) {
-      _addMessage('assistant', '⚠️ You are offline. Please connect to the server first.');
+      _addMessage('assistant',
+          '⚠️ You are offline. Please connect to the server first.');
       return;
     }
 
@@ -74,12 +88,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         replyText += '\n\n🛍 ${products.length} products matched';
       }
       if (resp['outfits'] != null) {
-        final variants = (resp['outfits']['variants'] as List?)?.length ?? 0;
+        final variants =
+            (resp['outfits']['variants'] as List?)?.length ?? 0;
         if (variants > 0) replyText += '\n👗 $variants outfit previews ready';
       }
       _addMessage('assistant', replyText);
     } catch (e) {
-      _addMessage('assistant', '❌ API error — is the server running?\nuvicorn services.api.main:app --port 8000');
+      _addMessage('assistant',
+          '❌ Could not reach the server.\nPlease check your connection.');
     } finally {
       setState(() => _loading = false);
     }
@@ -94,7 +110,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Future<void> _toggleRecording() async {
     if (_recording) {
-      // Stop recording
       final path = await _recorder.stop();
       setState(() => _recording = false);
 
@@ -108,7 +123,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           final b64 = base64Encode(bytes);
 
           final api = ref.read(apiClientProvider);
-          // Send as text for now — the backend will transcribe
           final resp = await api.sendChat(
             message: '[AUDIO:$b64]',
             sessionId: _sessionId,
@@ -123,14 +137,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         }
       }
     } else {
-      // Check permission and start recording
       if (await _recorder.hasPermission()) {
         await _recorder.start(const RecordConfig(), path: '');
         setState(() => _recording = true);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Microphone permission denied. Please enable it in Settings.')),
+            const SnackBar(
+                content: Text(
+                    'Microphone permission denied. Please enable it in Settings.')),
           );
         }
       }
@@ -142,115 +157,332 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final connState = ref.watch(connectionStateProvider);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Fashion Stylist'),
-        actions: [
-          if (connState == AppConnectionState.online)
-            const Padding(
-              padding: EdgeInsets.only(right: 12),
-              child: Icon(Icons.circle, color: Colors.green, size: 10),
+        backgroundColor: Colors.transparent,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Animated AURA logo dot
+            Container(
+              width: 10,
+              height: 10,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: connState == AppConnectionState.online
+                    ? const Color(0xFFD4AF37)
+                    : Colors.grey,
+                boxShadow: connState == AppConnectionState.online
+                    ? [
+                        BoxShadow(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
+              ),
             ),
-        ],
+            const Text('AURA'),
+            Text(
+              '  Stylist',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.4),
+                fontSize: 14,
+                fontWeight: FontWeight.w300,
+              ),
+            ),
+          ],
+        ),
       ),
       body: Column(
         children: [
           Expanded(
             child: _messages.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade400),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Ask me about fashion!\n"Wedding ki outfit suggest cheyyi"',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  )
+                ? _buildEmptyState()
                 : ListView.builder(
                     controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    itemCount: _messages.length + (_loading ? 1 : 0),
                     itemBuilder: (_, i) {
-                      final m = _messages[i];
-                      final isUser = m['role'] == 'user';
-                      return Align(
-                        alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.78,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isUser
-                                ? Theme.of(context).colorScheme.primaryContainer
-                                : Colors.grey.shade200,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: Radius.circular(isUser ? 16 : 4),
-                              bottomRight: Radius.circular(isUser ? 4 : 16),
-                            ),
-                          ),
-                          child: Text(m['text'] ?? ''),
-                        ),
-                      );
+                      if (i == _messages.length && _loading) {
+                        return _buildTypingIndicator();
+                      }
+                      return _buildMessageBubble(_messages[i]);
                     },
                   ),
           ),
-          if (_loading) const LinearProgressIndicator(),
+          _buildInputBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // AURA brand icon
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF8B1538), Color(0xFF4A148C)],
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
+                  color: const Color(0xFF8B1538).withValues(alpha: 0.4),
+                  blurRadius: 24,
+                  spreadRadius: 2,
                 ),
               ],
             ),
-            child: SafeArea(
-              top: false,
-              child: Row(
-                children: [
-                  // Mic button
-                  IconButton(
-                    icon: Icon(
-                      _recording ? Icons.stop_circle : Icons.mic,
-                      color: _recording ? Colors.red : null,
-                    ),
-                    onPressed: _toggleRecording,
-                    tooltip: _recording ? 'Stop recording' : 'Voice input',
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      decoration: InputDecoration(
-                        hintText: 'Wedding ki outfit cheppandi...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      ),
-                      onSubmitted: (_) => _send(),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton.filled(
-                    icon: const Icon(Icons.send),
-                    onPressed: _send,
+            child: const Icon(
+              Icons.auto_awesome,
+              color: Colors.white,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Your AI Fashion Stylist',
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  letterSpacing: -0.3,
+                ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Ask me about outfits, styling tips,\nor body-type recommendations',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 32),
+          // Quick action chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              _quickChip('👗 Wedding outfit'),
+              _quickChip('🎨 Color for my skin tone'),
+              _quickChip('📐 Body type dressing'),
+              _quickChip('💰 Budget outfit under ₹5000'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _quickChip(String label) {
+    return GestureDetector(
+      onTap: () {
+        _controller.text = label.replaceAll(RegExp(r'^[^\s]+ '), '');
+        _send();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: Colors.white.withValues(alpha: 0.06),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageBubble(Map<String, String> m) {
+    final isUser = m['role'] == 'user';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment:
+            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isUser) ...[
+            // AI avatar
+            Container(
+              width: 28,
+              height: 28,
+              margin: const EdgeInsets.only(right: 8, bottom: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF8B1538), Color(0xFF4A148C)],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        const Color(0xFF8B1538).withValues(alpha: 0.3),
+                    blurRadius: 8,
                   ),
                 ],
+              ),
+              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+            ),
+          ],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.of(context).size.width * 0.75,
+              ),
+              decoration:
+                  isUser ? AuraTheme.userBubble : AuraTheme.assistantBubble,
+              child: Text(
+                m['text'] ?? '',
+                style: TextStyle(
+                  color: isUser ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                  fontSize: 14.5,
+                  height: 1.4,
+                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [Color(0xFF8B1538), Color(0xFF4A148C)],
+              ),
+            ),
+            child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+          ),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: AuraTheme.assistantBubble,
+            child: AnimatedBuilder(
+              animation: _typingCtrl,
+              builder: (context, _) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (i) {
+                    final delay = i * 0.2;
+                    final t = (_typingCtrl.value + delay) % 1.0;
+                    final y = -4.0 * (t < 0.5 ? t : 1.0 - t);
+                    return Transform.translate(
+                      offset: Offset(0, y * 2),
+                      child: Container(
+                        width: 7,
+                        height: 7,
+                        margin: EdgeInsets.only(right: i < 2 ? 5 : 0),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFD4AF37)
+                              .withValues(alpha: 0.4 + 0.4 * (1 - t)),
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputBar() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF121218).withValues(alpha: 0.9),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          children: [
+            // Mic button with glow when recording
+            Container(
+              decoration: _recording
+                  ? BoxDecoration(
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withValues(alpha: 0.4),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    )
+                  : null,
+              child: IconButton(
+                icon: Icon(
+                  _recording ? Icons.stop_circle : Icons.mic_outlined,
+                  color: _recording
+                      ? Colors.red
+                      : Colors.white.withValues(alpha: 0.5),
+                ),
+                onPressed: _toggleRecording,
+                tooltip: _recording ? 'Stop recording' : 'Voice input',
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                style: const TextStyle(color: Colors.white, fontSize: 14.5),
+                decoration: const InputDecoration(
+                  hintText: 'Ask about outfits, fabrics, styling…',
+                ),
+                onSubmitted: (_) => _send(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Premium send button
+            Container(
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF8B1538), Color(0xFF6A0F2B)],
+                ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF8B1538).withValues(alpha: 0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_upward_rounded,
+                    color: Colors.white, size: 20),
+                onPressed: _send,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
