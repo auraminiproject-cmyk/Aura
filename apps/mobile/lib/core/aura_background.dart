@@ -293,7 +293,7 @@ class AuraTheme {
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: _surfaceDark.withValues(alpha: 0.95),
         indicatorColor: _brandCrimson.withValues(alpha: 0.25),
-        labelTextStyle: WidgetStatePropertyAll(
+        labelTextStyle: const WidgetStatePropertyAll(
           TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500),
         ),
         iconTheme: WidgetStateProperty.resolveWith((states) {
