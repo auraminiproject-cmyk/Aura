@@ -82,9 +82,9 @@ def _extract_relevant_knowledge(state: AgentState) -> str:
                 break
 
     # Budget tier
-    if params.budget:
+    if params.budget_inr:
         try:
-            budget = int(params.budget)
+            budget = int(params.budget_inr)
             tiers = kb.get("budget_tiers", {})
             for tier_name, tier in tiers.items():
                 range_str = tier.get("range", "")
