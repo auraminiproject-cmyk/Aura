@@ -11,22 +11,28 @@ final connectionStateProvider = StateProvider<AppConnectionState>(
 enum AppConnectionState { connecting, online, offline }
 
 /// The API client – always available (never throws).
-/// If guestLogin fails, the client is still usable for offline-tolerant UI;
-/// individual calls will fail gracefully.
 final apiClientProvider = Provider<ApiClient>((ref) {
   return ApiClient(baseUrl: AppConfig.apiBaseUrl);
 });
 
-/// Attempts guest login. Called once on app start; can be retried.
+/// Attempts to connect. First tries guest login; if the endpoint doesn't
+/// exist (404), falls back to health check to confirm the server is reachable.
 final initApiProvider = FutureProvider<void>((ref) async {
   final client = ref.read(apiClientProvider);
   final connState = ref.read(connectionStateProvider.notifier);
   connState.state = AppConnectionState.connecting;
 
   try {
+    // Try guest login first (full auth flow)
     await client.guestLogin();
     connState.state = AppConnectionState.online;
   } catch (_) {
-    connState.state = AppConnectionState.offline;
+    // If guest login fails (404, 500, etc.), try health check
+    try {
+      await client.healthCheck();
+      connState.state = AppConnectionState.online;
+    } catch (_) {
+      connState.state = AppConnectionState.offline;
+    }
   }
 });

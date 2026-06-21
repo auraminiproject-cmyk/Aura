@@ -6,7 +6,7 @@ class ApiClient {
   ApiClient({required String baseUrl, String? token})
       : _dio = Dio(BaseOptions(
           baseUrl: baseUrl,
-          connectTimeout: const Duration(seconds: 30),
+          connectTimeout: const Duration(seconds: 60),
           receiveTimeout: const Duration(seconds: 120),
           headers: {
             if (token != null) 'Authorization': 'Bearer $token',
@@ -18,6 +18,12 @@ class ApiClient {
 
   void setToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
+  }
+
+  /// Simple health check — just verifies server is reachable
+  Future<bool> healthCheck() async {
+    final resp = await _dio.get('/health');
+    return resp.statusCode == 200;
   }
 
   Future<Map<String, dynamic>> guestLogin({String? displayName}) async {
