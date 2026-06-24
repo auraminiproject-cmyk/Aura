@@ -78,6 +78,28 @@ def create_app() -> FastAPI:
             "llm_model": settings.llm_fast_model,
         }
 
+    @app.get("/debug/groq-test")
+    async def debug_groq():
+        """Temporary endpoint to test Groq connectivity from Render."""
+        import httpx
+        key = settings.groq_api_key
+        if not key:
+            return {"error": "GROQ_API_KEY not set"}
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}"},
+                    json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": "Say hello"}], "temperature": 0.1},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return {"status": "ok", "reply": data["choices"][0]["message"]["content"]}
+                else:
+                    return {"status": "error", "code": resp.status_code, "body": resp.text[:500]}
+        except Exception as e:
+            return {"status": "exception", "error": str(e)}
+
     return app
 
 
