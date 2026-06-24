@@ -9,15 +9,12 @@ import logging
 from typing import Any
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
 
 from services.api.core.config import get_settings
-from services.api.core.resilience import groq_breaker
 
 logger = logging.getLogger(__name__)
 
 
-@retry(wait=wait_exponential(multiplier=1, min=1, max=8), stop=stop_after_attempt(3), reraise=True)
 async def complete(
     prompt: str,
     *,
@@ -56,6 +53,7 @@ async def complete(
             try:
                 result = await _litellm_complete(messages, model=chosen, temperature=temperature)
                 trace.set_output(result[:500])
+                logger.info("LLM response via LiteLLM proxy")
                 return result
             except Exception as exc:
                 logger.warning("LiteLLM proxy unavailable: %s — falling through", exc)
@@ -63,25 +61,28 @@ async def complete(
         # Tier 2 — Groq Direct (production primary)
         if settings.groq_api_key and chosen.startswith("groq/"):
             try:
-                result = await _groq_complete(
-                    messages, model=chosen.replace("groq/", ""), temperature=temperature,
-                )
+                groq_model = chosen.replace("groq/", "")
+                logger.info("Calling Groq with model=%s, key=%s...", groq_model, settings.groq_api_key[:10])
+                result = await _groq_complete(messages, model=groq_model, temperature=temperature)
                 trace.set_output(result[:500])
+                logger.info("LLM response via Groq direct (%s)", groq_model)
                 return result
             except Exception as exc:
-                logger.error("Groq direct failed: %s (key=%s...)", exc, settings.groq_api_key[:10])
+                logger.error("Groq direct failed: %s", exc, exc_info=True)
         else:
-            logger.warning("Groq skipped: key=%s, model=%s", bool(settings.groq_api_key), chosen)
+            logger.warning("Groq skipped: key_set=%s, model=%s", bool(settings.groq_api_key), chosen)
 
         # Tier 3 — Ollama (local fallback)
         try:
             result = await _ollama_complete(prompt, system=system, temperature=temperature)
             trace.set_output(result[:500])
+            logger.info("LLM response via Ollama")
             return result
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Ollama unavailable: %s", exc)
 
         # Tier 4 — Offline heuristic
+        logger.warning("All LLM providers failed — using offline fallback")
         result = _offline_fallback(prompt)
         trace.set_output(result[:500])
         return result
@@ -108,29 +109,17 @@ async def _groq_complete(
     messages: list[dict[str, str]], *, model: str, temperature: float,
 ) -> str:
     settings = get_settings()
-
-    if groq_breaker.current_state == "open":
-        raise RuntimeError("Groq circuit breaker open")
-
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-                json={"model": model, "messages": messages, "temperature": temperature},
-            )
-            if resp.status_code == 429:
-                groq_breaker.fail()
-                logger.warning("Groq rate limited (429)")
-                raise RuntimeError("Groq rate limited")
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        resp = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+            json={"model": model, "messages": messages, "temperature": temperature},
+        )
+        if resp.status_code != 200:
+            logger.error("Groq HTTP %d: %s", resp.status_code, resp.text[:300])
             resp.raise_for_status()
-            data = resp.json()
-            groq_breaker.success()
-            return data["choices"][0]["message"]["content"].strip()
-    except Exception as exc:
-        groq_breaker.fail()
-        logger.warning("Groq error (circuit may open): %s", exc)
-        raise
+        data = resp.json()
+        return data["choices"][0]["message"]["content"].strip()
 
 
 async def _ollama_complete(prompt: str, *, system: str | None, temperature: float) -> str:
@@ -138,16 +127,13 @@ async def _ollama_complete(prompt: str, *, system: str | None, temperature: floa
     full_prompt = f"{system}\n\n{prompt}" if system else prompt
     model_name = settings.llm_fallback_model.replace("ollama/", "llama3.2")
 
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                f"{settings.ollama_base_url}/api/generate",
-                json={"model": model_name, "prompt": full_prompt, "stream": False, "options": {"temperature": temperature}},
-            )
-            if resp.status_code == 200:
-                return resp.json().get("response", "").strip()
-    except httpx.HTTPError as exc:
-        logger.warning("Ollama unavailable: %s", exc)
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            f"{settings.ollama_base_url}/api/generate",
+            json={"model": model_name, "prompt": full_prompt, "stream": False, "options": {"temperature": temperature}},
+        )
+        if resp.status_code == 200:
+            return resp.json().get("response", "").strip()
 
     raise RuntimeError("Ollama unavailable")
 

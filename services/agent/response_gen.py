@@ -171,7 +171,8 @@ async def synthesize_with_profile(
     )
     try:
         return await complete(prompt, system=system, temperature=0.5)
-    except Exception:
+    except Exception as exc:
+        logger.error("synthesize_with_profile complete() failed: %s", exc, exc_info=True)
         return (
             f"{state.params.occasion or 'Outfit'} ki red/gold ethnic wear suggest chestanu. "
             "Avatar kosam photos upload cheyandi."
