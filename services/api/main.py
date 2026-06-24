@@ -69,7 +69,14 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "env": settings.app_env}
+        groq_key = settings.groq_api_key
+        return {
+            "status": "ok",
+            "env": settings.app_env,
+            "groq_key_set": bool(groq_key),
+            "groq_key_prefix": groq_key[:10] + "..." if groq_key else "NOT_SET",
+            "llm_model": settings.llm_fast_model,
+        }
 
     return app
 

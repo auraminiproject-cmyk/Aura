@@ -68,8 +68,10 @@ async def complete(
                 )
                 trace.set_output(result[:500])
                 return result
-            except Exception:
-                pass  # already logged inside _groq_complete
+            except Exception as exc:
+                logger.error("Groq direct failed: %s (key=%s...)", exc, settings.groq_api_key[:10])
+        else:
+            logger.warning("Groq skipped: key=%s, model=%s", bool(settings.groq_api_key), chosen)
 
         # Tier 3 — Ollama (local fallback)
         try:
