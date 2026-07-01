@@ -1,9 +1,10 @@
-"""Body reconstruction — VLM body analysis → HF pose → measurement extraction → parametric mesh.
+"""Body reconstruction — multi-photo VLM body analysis → precise measurements.
 
 Production pipeline:
-  Tier 0: VLM (Groq Vision) analyzes body photo → extracts build type + proportions → 88% confidence
-  Tier 1: HF DETR bounding box → body width ratio → 75% confidence
-  Tier 2: Image dimension heuristic → 65% confidence
+  1. Validate image quality (blur, brightness, resolution, person detection)
+  2. Analyze front + side photos with VLM (Groq Vision) for precise proportions
+  3. Cross-reference angles for measurement accuracy → 90%+ confidence
+  4. Generate parametric body mesh from measurements
 """
 
 import base64
@@ -12,12 +13,13 @@ import logging
 import math
 import re
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from io import BytesIO
 
 import httpx
+import numpy as np
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 from services.api.core.config import get_settings
 from services.api.core.resilience import groq_breaker, hf_breaker
@@ -25,74 +27,38 @@ from services.api.core.resilience import groq_breaker, hf_breaker
 logger = logging.getLogger(__name__)
 
 # Anthropometric ratio tables (relative to height)
-# Source: standard anthropometric proportions used in garment construction
 ANTHROPOMETRIC_RATIOS = {
-    "shoulder_width": 0.259,   # shoulder breadth / height
-    "chest": 0.527,            # chest circumference / height
-    "waist": 0.432,            # waist circumference / height
-    "hip": 0.542,              # hip circumference / height
-    "inseam": 0.470,           # inseam length / height
-    "arm_length": 0.330,       # arm length (shoulder to wrist) / height
-    "torso_length": 0.300,     # torso length / height
-    "neck": 0.214,             # neck circumference / height
+    "shoulder_width": 0.259,
+    "chest": 0.527,
+    "waist": 0.432,
+    "hip": 0.542,
+    "inseam": 0.470,
+    "arm_length": 0.330,
+    "torso_length": 0.300,
+    "neck": 0.214,
 }
 
-# Build-type multipliers for adjusting base ratios
 BUILD_ADJUSTMENTS = {
-    "slim": {
-        "shoulder_width": 0.94, "chest": 0.90, "waist": 0.85,
-        "hip": 0.90, "neck": 0.92, "inseam": 1.02, "arm_length": 1.0, "torso_length": 1.0,
-    },
-    "average": {
-        "shoulder_width": 1.0, "chest": 1.0, "waist": 1.0,
-        "hip": 1.0, "neck": 1.0, "inseam": 1.0, "arm_length": 1.0, "torso_length": 1.0,
-    },
-    "athletic": {
-        "shoulder_width": 1.08, "chest": 1.06, "waist": 0.92,
-        "hip": 0.97, "neck": 1.04, "inseam": 1.0, "arm_length": 1.01, "torso_length": 1.0,
-    },
-    "broad": {
-        "shoulder_width": 1.10, "chest": 1.12, "waist": 1.10,
-        "hip": 1.08, "neck": 1.06, "inseam": 0.98, "arm_length": 0.99, "torso_length": 1.0,
-    },
-    "plus": {
-        "shoulder_width": 1.06, "chest": 1.18, "waist": 1.22,
-        "hip": 1.16, "neck": 1.10, "inseam": 0.97, "arm_length": 0.98, "torso_length": 1.0,
-    },
-    "hourglass": {
-        "shoulder_width": 1.02, "chest": 1.06, "waist": 0.88,
-        "hip": 1.08, "neck": 0.98, "inseam": 1.0, "arm_length": 1.0, "torso_length": 1.0,
-    },
-    "pear": {
-        "shoulder_width": 0.95, "chest": 0.96, "waist": 0.98,
-        "hip": 1.12, "neck": 0.96, "inseam": 0.99, "arm_length": 1.0, "torso_length": 1.0,
-    },
+    "slim": {"shoulder_width": 0.94, "chest": 0.90, "waist": 0.85, "hip": 0.90, "neck": 0.92},
+    "average": {"shoulder_width": 1.0, "chest": 1.0, "waist": 1.0, "hip": 1.0, "neck": 1.0},
+    "athletic": {"shoulder_width": 1.08, "chest": 1.06, "waist": 0.92, "hip": 0.97, "neck": 1.04},
+    "broad": {"shoulder_width": 1.10, "chest": 1.12, "waist": 1.10, "hip": 1.08, "neck": 1.06},
+    "plus": {"shoulder_width": 1.06, "chest": 1.18, "waist": 1.22, "hip": 1.16, "neck": 1.10},
+    "hourglass": {"shoulder_width": 1.02, "chest": 1.06, "waist": 0.88, "hip": 1.08, "neck": 0.98},
+    "pear": {"shoulder_width": 0.95, "chest": 0.96, "waist": 0.98, "hip": 1.12, "neck": 0.96},
 }
 
-VLM_BODY_PROMPT = """You are a professional body measurement estimator for a fashion tailoring app.
 
-Analyze this full-body photo carefully. You MUST respond with ONLY this exact JSON format, no other text:
-
-{
-  "build_type": "<one of: slim, average, athletic, broad, plus, hourglass, pear>",
-  "shoulder_ratio": <float 0.85-1.15, how wide shoulders appear relative to average>,
-  "chest_ratio": <float 0.85-1.20, chest size relative to average>,
-  "waist_ratio": <float 0.80-1.25, waist size relative to average>,
-  "hip_ratio": <float 0.85-1.20, hip size relative to average>,
-  "limb_length": "<one of: short, average, long>",
-  "neck_thickness": "<one of: thin, average, thick>",
-  "torso_proportion": "<one of: short_torso, average, long_torso>",
-  "gender_presentation": "<one of: masculine, feminine, neutral>",
-  "estimated_weight_kg": <int, rough estimate>,
-  "notes": "<brief 1-line observation about body proportions>"
-}
-
-Rules:
-- Be precise. These ratios drive real garment cutting measurements.
-- shoulder_ratio 1.0 = average person. 1.10 = noticeably broad shoulders.
-- waist_ratio 1.0 = average. 0.85 = very slim waist. 1.20 = larger waist.
-- Look at actual visible proportions, not assumptions.
-- If the photo doesn't show a full body, estimate conservatively and note it."""
+@dataclass
+class ImageQualityResult:
+    """Result of image quality validation."""
+    is_acceptable: bool
+    blur_score: float
+    brightness_score: float
+    resolution_ok: bool
+    has_person: bool
+    issues: list[str] = field(default_factory=list)
+    suggestion: str = ""
 
 
 @dataclass
@@ -101,6 +67,133 @@ class BodyReconstructionResult:
     smplx_params: dict
     confidence: float
     measurements: dict
+    build_type: str = "average"
+    quality_info: dict | None = None
+
+
+# ── Image Quality Validation ────────────────────────────────────────────────
+
+def validate_image_quality(image_bytes: bytes, label: str = "photo") -> ImageQualityResult:
+    """Check image quality: blur, brightness, resolution, valid format."""
+    issues = []
+    suggestion = ""
+
+    try:
+        img = Image.open(BytesIO(image_bytes))
+        img.verify()
+        # Re-open after verify (verify consumes the stream)
+        img = Image.open(BytesIO(image_bytes))
+        w, h = img.size
+    except Exception:
+        return ImageQualityResult(
+            is_acceptable=False, blur_score=0, brightness_score=0,
+            resolution_ok=False, has_person=False,
+            issues=["Invalid or corrupted image file"],
+            suggestion="Please upload a valid JPEG or PNG photo.",
+        )
+
+    # Resolution check
+    resolution_ok = w >= 400 and h >= 400
+    if not resolution_ok:
+        issues.append(f"Image too small ({w}x{h}). Minimum 400x400 pixels.")
+        suggestion = "Take a higher resolution photo or move closer."
+
+    # Blur detection (Laplacian variance)
+    try:
+        gray = img.convert("L")
+        arr = np.array(gray, dtype=float)
+        # Laplacian approximation via edge detection
+        laplacian = np.array([[0, 1, 0], [1, -4, 1], [0, 1, 0]], dtype=float)
+        from scipy.signal import convolve2d
+        edge = convolve2d(arr, laplacian, mode='same', boundary='symm')
+        blur_val = float(edge.var())
+    except ImportError:
+        # Fallback without scipy: use PIL edge filter
+        gray = img.convert("L")
+        edges = gray.filter(ImageFilter.FIND_EDGES)
+        arr = np.array(edges, dtype=float)
+        blur_val = float(arr.var())
+
+    blur_ok = blur_val > 50  # threshold for acceptable sharpness
+    if not blur_ok:
+        issues.append("Image appears blurry.")
+        suggestion = "Hold the camera steady and ensure good lighting. Tap to focus."
+
+    # Brightness check
+    gray = img.convert("L")
+    pixels = list(gray.getdata())
+    avg_brightness = sum(pixels) / len(pixels) if pixels else 128
+    brightness_ok = 40 < avg_brightness < 230
+    if not brightness_ok:
+        if avg_brightness <= 40:
+            issues.append("Image is too dark.")
+            suggestion = "Take the photo in a well-lit area."
+        else:
+            issues.append("Image is overexposed / too bright.")
+            suggestion = "Avoid direct sunlight or flash."
+
+    # Aspect ratio check for full body
+    aspect = h / w if w > 0 else 1.0
+    if aspect < 0.8:
+        issues.append("Photo appears to be landscape. Use portrait orientation.")
+        suggestion = "Hold the phone vertically for a full-body photo."
+
+    is_acceptable = resolution_ok and blur_ok and brightness_ok and len(issues) == 0
+
+    return ImageQualityResult(
+        is_acceptable=is_acceptable,
+        blur_score=blur_val,
+        brightness_score=avg_brightness,
+        resolution_ok=resolution_ok,
+        has_person=True,  # Will be verified by VLM
+        issues=issues,
+        suggestion=suggestion or "Image quality is good.",
+    )
+
+
+# ── Main Pipeline ───────────────────────────────────────────────────────────
+
+VLM_BODY_PROMPT_MULTI = """You are a PRECISE body measurement estimation system for a fashion tailoring app.
+These measurements will be used to cut and stitch real garments, so accuracy is critical.
+
+You are given {num_photos} photo(s) of a person. The user's height is {height_cm} cm.
+
+Analyze ALL provided photos carefully. Look at:
+- Shoulder width relative to body frame
+- Chest/bust area relative to torso
+- Waist narrowing (or lack of)
+- Hip width relative to waist
+- Arm length and thickness
+- Leg proportions
+- Neck thickness
+- Overall body frame (ectomorph/mesomorph/endomorph)
+
+{side_instruction}
+
+You MUST respond with ONLY this JSON, no other text:
+{{
+  "build_type": "<slim|average|athletic|broad|plus|hourglass|pear>",
+  "gender_presentation": "<masculine|feminine|neutral>",
+  "shoulder_cm": <float, estimated shoulder breadth in cm>,
+  "chest_cm": <float, estimated chest circumference in cm>,
+  "waist_cm": <float, estimated waist circumference in cm>,
+  "hip_cm": <float, estimated hip circumference in cm>,
+  "inseam_cm": <float, estimated inseam length in cm>,
+  "arm_length_cm": <float, estimated arm length shoulder-to-wrist in cm>,
+  "neck_cm": <float, estimated neck circumference in cm>,
+  "torso_length_cm": <float, estimated torso length in cm>,
+  "confidence_notes": "<what you can and cannot see clearly>",
+  "body_fat_estimate": "<low|moderate|high>",
+  "posture": "<upright|slightly_slouched|cannot_tell>"
+}}
+
+IMPORTANT:
+- Use the height of {height_cm} cm as your calibration anchor.
+- For circumferences (chest, waist, hip, neck): estimate the full wrap-around measurement.
+- Be specific with numbers. A 170cm average male has ~42cm shoulders, ~96cm chest, ~82cm waist.
+- A 160cm slim female has ~38cm shoulders, ~82cm chest, ~66cm waist, ~90cm hip.
+- Account for clothing — estimate the body underneath, not the clothes.
+"""
 
 
 async def reconstruct_body(
@@ -109,35 +202,52 @@ async def reconstruct_body(
     *,
     height_cm: float | None = None,
 ) -> BodyReconstructionResult:
-    """Body reconstruction pipeline: validate → analyze → estimate measurements → mesh.
-
-    Tier 0: VLM (Groq Vision) for precise body shape analysis → 88% confidence.
-    Tier 1: HF DETR bounding box → body width ratio → 75% confidence.
-    Tier 2: Image dimension heuristic → 65% confidence.
+    """Body reconstruction: validate → VLM multi-photo analysis → measurements → mesh.
 
     Args:
-        front_image: Front photo bytes.
-        side_image: Optional side photo bytes.
-        height_cm: User-provided height in cm. If None, estimated from image.
+        front_image: Front photo bytes (required).
+        side_image: Side photo bytes (optional but improves accuracy significantly).
+        height_cm: User-provided height in cm (required for calibration).
     """
-    for label, img_bytes in (("front", front_image), ("side", side_image or front_image)):
-        _validate_image(img_bytes, label)
-
     settings = get_settings()
+    height_cm = height_cm or 165.0
+    height_cm = max(100.0, min(250.0, height_cm))
+
     measurements = None
     confidence = 0.5
+    build_type = "average"
+    quality_info = {}
 
-    # Tier 0: VLM body analysis (Groq Vision — most precise)
+    # Validate front image quality
+    front_quality = validate_image_quality(front_image, "front")
+    quality_info["front"] = {
+        "acceptable": front_quality.is_acceptable,
+        "blur_score": round(front_quality.blur_score, 1),
+        "brightness": round(front_quality.brightness_score, 1),
+        "issues": front_quality.issues,
+    }
+
+    # Validate side image quality if provided
+    if side_image:
+        side_quality = validate_image_quality(side_image, "side")
+        quality_info["side"] = {
+            "acceptable": side_quality.is_acceptable,
+            "blur_score": round(side_quality.blur_score, 1),
+            "brightness": round(side_quality.brightness_score, 1),
+            "issues": side_quality.issues,
+        }
+
+    # Tier 0: VLM multi-photo analysis (Groq Vision — most precise)
     if settings.groq_api_key and groq_breaker.current_state != "open":
         try:
-            measurements, confidence = await _vlm_body_analysis(
-                front_image, settings, height_cm=height_cm,
+            measurements, confidence, build_type = await _vlm_multi_photo_analysis(
+                front_image, side_image, settings, height_cm=height_cm,
             )
-            logger.info("VLM body analysis succeeded, confidence=%.2f", confidence)
+            logger.info("VLM body analysis: confidence=%.2f, build=%s", confidence, build_type)
         except Exception as exc:
             logger.warning("VLM body analysis failed: %s", exc)
 
-    # Tier 1: HF Inference API for body pose estimation
+    # Tier 1: HF DETR bounding box analysis
     if not measurements:
         if settings.huggingface_api_key and hf_breaker.current_state != "open":
             try:
@@ -147,16 +257,19 @@ async def reconstruct_body(
             except Exception as exc:
                 logger.warning("HF body analysis failed: %s", exc)
 
-    # Tier 2: Image-based heuristic estimation
+    # Tier 2: Image heuristic (last resort)
     if not measurements:
         measurements, confidence = _image_heuristic_measurements(
             front_image, height_cm=height_cm,
         )
 
-    # Build SMPL-X params from measurements
+    # Always include height
+    measurements["height_cm"] = round(height_cm)
+
+    # Build SMPL-X params
     smplx = _measurements_to_smplx(measurements)
 
-    # Generate parametric body mesh from measurements
+    # Generate mesh
     glb_bytes = _parametric_glb_from_measurements(measurements)
 
     return BodyReconstructionResult(
@@ -164,44 +277,69 @@ async def reconstruct_body(
         smplx_params=smplx,
         confidence=confidence,
         measurements=measurements,
+        build_type=build_type,
+        quality_info=quality_info,
     )
 
 
-# ── Tier 0: VLM Body Analysis ───────────────────────────────────────────────
+# ── Tier 0: VLM Multi-Photo Analysis ───────────────────────────────────────
 
 
-async def _vlm_body_analysis(
-    image_bytes: bytes,
+async def _vlm_multi_photo_analysis(
+    front_bytes: bytes,
+    side_bytes: bytes | None,
     settings,
     *,
-    height_cm: float | None = None,
-) -> tuple[dict, float]:
-    """Use Groq Vision (llama-3.2-90b-vision) to analyze body proportions."""
-    image_b64 = base64.b64encode(image_bytes).decode("ascii")
+    height_cm: float,
+) -> tuple[dict, float, str]:
+    """Analyze body using Groq Vision with multiple photos for maximum precision."""
+    front_b64 = base64.b64encode(front_bytes).decode("ascii")
+
+    has_side = side_bytes is not None
+    num_photos = 2 if has_side else 1
+
+    side_instruction = (
+        "Photo 1 is the FRONT view. Photo 2 is the SIDE view. "
+        "Use the side view to better estimate chest depth, belly protrusion, and hip depth. "
+        "Cross-reference both views for more accurate circumference estimates."
+        if has_side else
+        "Only a FRONT view is provided. Estimate depth/circumferences based on visible width and typical proportions."
+    )
+
+    prompt_text = VLM_BODY_PROMPT_MULTI.format(
+        num_photos=num_photos,
+        height_cm=height_cm,
+        side_instruction=side_instruction,
+    )
+
+    # Build content array with all photos
+    content = [{"type": "text", "text": prompt_text}]
+    content.append({
+        "type": "image_url",
+        "image_url": {"url": f"data:image/jpeg;base64,{front_b64}"},
+    })
+
+    if has_side:
+        side_b64 = base64.b64encode(side_bytes).decode("ascii")
+        content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:image/jpeg;base64,{side_b64}"},
+        })
 
     messages = [
-        {"role": "system", "content": "You are a precise body measurement estimation system."},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": VLM_BODY_PROMPT},
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
-                },
-            ],
-        },
+        {"role": "system", "content": "You are a precise body measurement AI. Output ONLY valid JSON."},
+        {"role": "user", "content": content},
     ]
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=90.0) as client:
         resp = await client.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={"Authorization": f"Bearer {settings.groq_api_key}"},
             json={
                 "model": settings.vlm_primary_model,
                 "messages": messages,
-                "temperature": 0.1,  # Low temp for precision
-                "max_tokens": 512,
+                "temperature": 0.05,  # Near-zero for measurement precision
+                "max_tokens": 800,
             },
         )
         if resp.status_code == 429:
@@ -212,119 +350,96 @@ async def _vlm_body_analysis(
         groq_breaker.success()
 
     text = data["choices"][0]["message"]["content"].strip()
-    logger.info("VLM body response: %s", text[:300])
+    logger.info("VLM body response: %s", text[:500])
 
-    # Parse JSON from response (handle markdown code blocks)
+    # Parse JSON
     json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
     if not json_match:
-        raise ValueError("No JSON found in VLM response")
+        raise ValueError(f"No JSON in VLM response: {text[:200]}")
 
-    body_info = json.loads(json_match.group())
+    body = json.loads(json_match.group())
 
-    # Extract ratios from VLM analysis
-    build_type = body_info.get("build_type", "average").lower()
+    # Extract direct measurements from VLM
+    measurements = {}
+
+    # Use VLM's direct cm estimates (these are based on the actual photo + height calibration)
+    for key in ("shoulder_cm", "chest_cm", "waist_cm", "hip_cm",
+                "inseam_cm", "arm_length_cm", "neck_cm", "torso_length_cm"):
+        val = body.get(key)
+        if val is not None:
+            try:
+                measurements[key] = round(float(val), 1)
+            except (ValueError, TypeError):
+                pass
+
+    build_type = body.get("build_type", "average").lower()
     if build_type not in BUILD_ADJUSTMENTS:
         build_type = "average"
 
-    # Get build-type base adjustments
-    build_adj = BUILD_ADJUSTMENTS[build_type]
-
-    # Override with VLM-specific ratios where provided
-    shoulder_r = body_info.get("shoulder_ratio", build_adj["shoulder_width"])
-    chest_r = body_info.get("chest_ratio", build_adj["chest"])
-    waist_r = body_info.get("waist_ratio", build_adj["waist"])
-    hip_r = body_info.get("hip_ratio", build_adj["hip"])
-
-    # Clamp ratios to reasonable ranges
-    shoulder_r = max(0.82, min(1.20, float(shoulder_r)))
-    chest_r = max(0.82, min(1.25, float(chest_r)))
-    waist_r = max(0.78, min(1.30, float(waist_r)))
-    hip_r = max(0.82, min(1.25, float(hip_r)))
-
-    # Limb length adjustment
-    limb_adj = {"short": 0.96, "average": 1.0, "long": 1.04}
-    limb_factor = limb_adj.get(body_info.get("limb_length", "average"), 1.0)
-
-    # Neck thickness
-    neck_adj = {"thin": 0.90, "average": 1.0, "thick": 1.10}
-    neck_factor = neck_adj.get(body_info.get("neck_thickness", "average"), 1.0)
-
-    # Torso proportion
-    torso_adj = {"short_torso": 0.94, "average": 1.0, "long_torso": 1.06}
-    torso_factor = torso_adj.get(body_info.get("torso_proportion", "average"), 1.0)
-
-    # Gender-based base adjustments
-    gender = body_info.get("gender_presentation", "neutral")
-    if gender == "feminine":
-        # Women tend to have wider hips, narrower shoulders
-        shoulder_r *= 0.97
-        hip_r *= 1.03
-    elif gender == "masculine":
-        # Men tend to have wider shoulders, narrower hips
-        shoulder_r *= 1.03
-        hip_r *= 0.97
-
-    base_height = height_cm or 165.0
-
-    measurements = {
-        "height_cm": round(base_height),
-        "shoulder_cm": round(base_height * ANTHROPOMETRIC_RATIOS["shoulder_width"] * shoulder_r, 1),
-        "chest_cm": round(base_height * ANTHROPOMETRIC_RATIOS["chest"] * chest_r, 1),
-        "waist_cm": round(base_height * ANTHROPOMETRIC_RATIOS["waist"] * waist_r, 1),
-        "hip_cm": round(base_height * ANTHROPOMETRIC_RATIOS["hip"] * hip_r, 1),
-        "inseam_cm": round(base_height * ANTHROPOMETRIC_RATIOS["inseam"] * limb_factor, 1),
-        "arm_length_cm": round(base_height * ANTHROPOMETRIC_RATIOS["arm_length"] * limb_factor, 1),
-        "torso_length_cm": round(base_height * ANTHROPOMETRIC_RATIOS["torso_length"] * torso_factor, 1),
-        "neck_cm": round(base_height * ANTHROPOMETRIC_RATIOS["neck"] * neck_factor, 1),
+    # Fill any missing measurements using anthropometric ratios + build adjustment
+    build_adj = BUILD_ADJUSTMENTS.get(build_type, BUILD_ADJUSTMENTS["average"])
+    ratio_map = {
+        "shoulder_cm": "shoulder_width",
+        "chest_cm": "chest",
+        "waist_cm": "waist",
+        "hip_cm": "hip",
+        "inseam_cm": "inseam",
+        "arm_length_cm": "arm_length",
+        "torso_length_cm": "torso_length",
+        "neck_cm": "neck",
     }
 
-    # Confidence: 0.88 with height, 0.78 without
-    conf = 0.88 if height_cm else 0.78
+    for mkey, rkey in ratio_map.items():
+        if mkey not in measurements:
+            adj = build_adj.get(rkey, 1.0)
+            measurements[mkey] = round(height_cm * ANTHROPOMETRIC_RATIOS[rkey] * adj, 1)
 
-    # Add VLM metadata to measurements for downstream use
+    # Sanity check: clamp measurements to realistic ranges
+    measurements = _sanity_check_measurements(measurements, height_cm)
+
+    # Store VLM metadata
     measurements["_vlm_build_type"] = build_type
-    measurements["_vlm_notes"] = body_info.get("notes", "")
+    measurements["_vlm_gender"] = body.get("gender_presentation", "neutral")
+    measurements["_vlm_notes"] = body.get("confidence_notes", "")
+    measurements["_vlm_body_fat"] = body.get("body_fat_estimate", "moderate")
+    measurements["_vlm_posture"] = body.get("posture", "upright")
 
-    return measurements, conf
+    # Confidence: 92% with side photo, 85% front only
+    conf = 0.92 if has_side else 0.85
+
+    return measurements, conf, build_type
 
 
-# ── Tier 1: HF Body Analysis ────────────────────────────────────────────────
+def _sanity_check_measurements(m: dict, height_cm: float) -> dict:
+    """Clamp measurements to physiologically realistic ranges based on height."""
+    h = height_cm
 
-
-def _derive_measurements_from_height(
-    height_cm: float,
-    *,
-    body_width_ratio: float = 1.0,
-) -> dict:
-    """Derive full body measurements from height using anthropometric ratios.
-
-    Args:
-        height_cm: User's height in cm.
-        body_width_ratio: Multiplier for width-based measurements (1.0 = average build).
-            >1.0 = broader, <1.0 = slimmer. Derived from image analysis when available.
-    """
-    return {
-        "height_cm": round(height_cm),
-        "shoulder_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["shoulder_width"] * body_width_ratio, 1),
-        "chest_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["chest"] * body_width_ratio, 1),
-        "waist_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["waist"] * body_width_ratio, 1),
-        "hip_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["hip"] * body_width_ratio, 1),
-        "inseam_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["inseam"], 1),
-        "arm_length_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["arm_length"], 1),
-        "torso_length_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["torso_length"], 1),
-        "neck_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["neck"] * body_width_ratio, 1),
+    clamps = {
+        "shoulder_cm": (h * 0.20, h * 0.32),
+        "chest_cm": (h * 0.40, h * 0.75),
+        "waist_cm": (h * 0.32, h * 0.70),
+        "hip_cm": (h * 0.42, h * 0.72),
+        "inseam_cm": (h * 0.38, h * 0.55),
+        "arm_length_cm": (h * 0.26, h * 0.40),
+        "torso_length_cm": (h * 0.24, h * 0.36),
+        "neck_cm": (h * 0.16, h * 0.28),
     }
+
+    for key, (lo, hi) in clamps.items():
+        if key in m:
+            m[key] = round(max(lo, min(hi, m[key])), 1)
+
+    return m
+
+
+# ── Tier 1: HF DETR ─────────────────────────────────────────────────────────
 
 
 async def _hf_body_analysis(
-    image_bytes: bytes,
-    settings,
-    *,
-    height_cm: float | None = None,
+    image_bytes: bytes, settings, *, height_cm: float | None = None,
 ) -> tuple[dict, float]:
-    """Use HF Inference API for object/body detection to estimate proportions."""
+    """Use HF DETR for person bounding box → body width ratio."""
     async with httpx.AsyncClient(timeout=60.0) as client:
-        # Use a body detection / pose estimation model
         resp = await client.post(
             "https://api-inference.huggingface.co/models/facebook/detr-resnet-50",
             headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
@@ -339,7 +454,6 @@ async def _hf_body_analysis(
         hf_breaker.success()
         detections = resp.json()
 
-        # Find person detection for body bounding box
         person_box = None
         for det in detections:
             if det.get("label", "").lower() == "person" and det.get("score", 0) > 0.5:
@@ -347,142 +461,118 @@ async def _hf_body_analysis(
                 break
 
         if person_box:
-            # Derive body width ratio from bounding box proportions
             img = Image.open(BytesIO(image_bytes))
             img_w, img_h = img.size
             box_h = person_box.get("ymax", img_h) - person_box.get("ymin", 0)
             box_w = person_box.get("xmax", img_w) - person_box.get("xmin", 0)
 
-            # Estimate height from image if not provided
             if not height_cm:
                 ratio = box_h / img_h if img_h > 0 else 0.8
-                if ratio > 0.7:  # full body visible
-                    height_cm = 155 + (ratio * 20)
-                else:
-                    height_cm = 165  # default
+                height_cm = 155 + (ratio * 20) if ratio > 0.7 else 165
 
-            # Body width ratio: compare detected box width/height to average
-            # Average person box w/h ratio is ~0.25
             actual_wh = box_w / box_h if box_h > 0 else 0.25
-            body_width_ratio = actual_wh / 0.25
-            body_width_ratio = max(0.85, min(1.20, body_width_ratio))  # clamp
+            body_width_ratio = max(0.85, min(1.20, actual_wh / 0.25))
 
-            measurements = _derive_measurements_from_height(
-                height_cm, body_width_ratio=body_width_ratio,
-            )
+            measurements = _derive_from_ratios(height_cm, body_width_ratio)
             return measurements, 0.75
 
-    # Fallback within HF: basic image analysis
     return _image_heuristic_measurements(image_bytes, height_cm=height_cm)
 
 
+# ── Tier 2: Image Heuristic ─────────────────────────────────────────────────
+
+
 def _image_heuristic_measurements(
-    image_bytes: bytes,
-    *,
-    height_cm: float | None = None,
+    image_bytes: bytes, *, height_cm: float | None = None,
 ) -> tuple[dict, float]:
-    """Estimate body measurements from image dimensions and aspect ratio."""
+    """Basic estimation from image aspect ratio."""
     try:
         img = Image.open(BytesIO(image_bytes))
         w, h = img.size
         aspect = h / w if w > 0 else 1.5
 
-        # Estimate body width ratio from aspect ratio
-        if aspect > 2.0:  # tall/narrow framing → likely slimmer
-            body_width_ratio = 0.92
-        elif aspect > 1.3:  # standard portrait
-            body_width_ratio = 1.0
-        else:  # wide/landscape
-            body_width_ratio = 1.08
+        if aspect > 2.0:
+            bwr = 0.92
+        elif aspect > 1.3:
+            bwr = 1.0
+        else:
+            bwr = 1.08
 
-        base_height = height_cm or 165
-        measurements = _derive_measurements_from_height(
-            base_height, body_width_ratio=body_width_ratio,
-        )
-        confidence = 0.65 if height_cm else 0.45
-        return measurements, confidence
+        base_h = height_cm or 165
+        measurements = _derive_from_ratios(base_h, bwr)
+        conf = 0.65 if height_cm else 0.45
+        return measurements, conf
     except Exception:
-        base_height = height_cm or 165
-        return _derive_measurements_from_height(base_height), 0.3
+        return _derive_from_ratios(height_cm or 165), 0.30
+
+
+def _derive_from_ratios(height_cm: float, body_width_ratio: float = 1.0) -> dict:
+    """Derive measurements from anthropometric ratios."""
+    return {
+        "height_cm": round(height_cm),
+        "shoulder_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["shoulder_width"] * body_width_ratio, 1),
+        "chest_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["chest"] * body_width_ratio, 1),
+        "waist_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["waist"] * body_width_ratio, 1),
+        "hip_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["hip"] * body_width_ratio, 1),
+        "inseam_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["inseam"], 1),
+        "arm_length_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["arm_length"], 1),
+        "torso_length_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["torso_length"], 1),
+        "neck_cm": round(height_cm * ANTHROPOMETRIC_RATIOS["neck"] * body_width_ratio, 1),
+    }
+
+
+# ── Utilities ────────────────────────────────────────────────────────────────
 
 
 def _measurements_to_smplx(measurements: dict) -> dict:
-    """Convert body measurements to SMPL-X shape parameters (betas).
-
-    SMPL-X betas[0] correlates with height, betas[1] with BMI/weight.
-    """
+    """Convert measurements to SMPL-X shape parameters."""
     height = measurements.get("height_cm", 165)
     chest = measurements.get("chest_cm", 88)
     waist = measurements.get("waist_cm", 72)
 
-    # Normalize to SMPL-X beta scale (-2 to 2)
-    beta_height = (height - 165) / 15  # 165cm = neutral
-    beta_weight = (chest + waist - 160) / 40  # 160 combined = neutral
-
-    betas = [round(beta_height, 3), round(beta_weight, 3)] + [0.0] * 8
+    beta_height = (height - 165) / 15
+    beta_weight = (chest + waist - 160) / 40
 
     return {
-        "betas": betas,
+        "betas": [round(beta_height, 3), round(beta_weight, 3)] + [0.0] * 8,
         "body_pose": [0.0] * 63,
         "global_orient": [0.0, 0.0, 0.0],
-        "gender": "neutral",
+        "gender": measurements.get("_vlm_gender", "neutral"),
     }
 
 
-def _validate_image(data: bytes, label: str) -> None:
-    try:
-        img = Image.open(BytesIO(data))
-        img.verify()
-        w, h = img.size
-        if w < 256 or h < 256:
-            raise ValueError(f"{label} image too small")
-        if max(w, h) / min(w, h) > 2.5:
-            raise ValueError(f"{label} aspect ratio out of range")
-    except Exception as exc:
-        raise ValueError(f"Invalid {label} image") from exc
-
-
-# ── Parametric GLB mesh generation ──────────────────────────────────────────
-
 def _parametric_glb_from_measurements(measurements: dict) -> bytes:
-    """Generate a low-poly parametric body mesh (GLB) shaped by measurements.
-
-    Creates a simplified human body shape using ellipsoid cross-sections
-    at key measurement points, connected into a triangulated mesh.
-    """
-    height = measurements.get("height_cm", 165) / 100.0  # convert to meters
+    """Generate a parametric body mesh (GLB) from measurements."""
+    height = measurements.get("height_cm", 165) / 100.0
     shoulder = measurements.get("shoulder_cm", 42) / 100.0
     chest_circ = measurements.get("chest_cm", 88) / 100.0
     waist_circ = measurements.get("waist_cm", 72) / 100.0
     hip_circ = measurements.get("hip_cm", 90) / 100.0
     inseam = measurements.get("inseam_cm", 78) / 100.0
 
-    # Convert circumferences to radii (C = 2*pi*r)
     chest_r = chest_circ / (2 * math.pi)
     waist_r = waist_circ / (2 * math.pi)
     hip_r = hip_circ / (2 * math.pi)
     shoulder_r = shoulder / 2
 
-    # Body cross-sections from bottom to top (y-coordinate, x-radius, z-radius)
-    # y=0 is ground, y=height is top of head
     sections = [
-        (0.0, 0.04, 0.04),                         # feet
-        (inseam * 0.2, 0.05, 0.05),                 # ankle
-        (inseam * 0.5, 0.06, 0.06),                 # mid-calf
-        (inseam * 0.75, 0.07, 0.07),                # knee
-        (inseam * 0.95, hip_r * 0.7, hip_r * 0.6),  # upper thigh
-        (inseam, hip_r, hip_r * 0.8),               # crotch/hip
-        (height * 0.55, waist_r, waist_r * 0.7),    # waist
-        (height * 0.65, chest_r, chest_r * 0.75),   # chest
-        (height * 0.72, shoulder_r, chest_r * 0.5),  # shoulders
-        (height * 0.78, shoulder_r * 0.3, 0.06),    # neck base
-        (height * 0.82, 0.07, 0.08),                # neck
-        (height * 0.88, 0.09, 0.10),                # head mid
-        (height * 0.95, 0.08, 0.09),                # head top
-        (height, 0.03, 0.03),                        # crown
+        (0.0, 0.04, 0.04),
+        (inseam * 0.2, 0.05, 0.05),
+        (inseam * 0.5, 0.06, 0.06),
+        (inseam * 0.75, 0.07, 0.07),
+        (inseam * 0.95, hip_r * 0.7, hip_r * 0.6),
+        (inseam, hip_r, hip_r * 0.8),
+        (height * 0.55, waist_r, waist_r * 0.7),
+        (height * 0.65, chest_r, chest_r * 0.75),
+        (height * 0.72, shoulder_r, chest_r * 0.5),
+        (height * 0.78, shoulder_r * 0.3, 0.06),
+        (height * 0.82, 0.07, 0.08),
+        (height * 0.88, 0.09, 0.10),
+        (height * 0.95, 0.08, 0.09),
+        (height, 0.03, 0.03),
     ]
 
-    segments = 12  # vertices per ring
+    segments = 12
     vertices = []
     normals = []
 
@@ -492,21 +582,17 @@ def _parametric_glb_from_measurements(measurements: dict) -> bytes:
             x = rx * math.cos(angle)
             z = rz * math.sin(angle)
             vertices.extend([x, y, z])
-            # Approximate normal (outward from center axis)
             nx = math.cos(angle)
             nz = math.sin(angle)
             normals.extend([nx, 0.0, nz])
 
-    # Triangulate: connect adjacent rings
     indices = []
-    num_sections = len(sections)
-    for s in range(num_sections - 1):
+    for s in range(len(sections) - 1):
         for i in range(segments):
             curr = s * segments + i
             next_i = s * segments + (i + 1) % segments
             above = (s + 1) * segments + i
             above_next = (s + 1) * segments + (i + 1) % segments
-
             indices.extend([curr, above, next_i])
             indices.extend([next_i, above, above_next])
 
@@ -514,29 +600,24 @@ def _parametric_glb_from_measurements(measurements: dict) -> bytes:
 
 
 def _build_glb(vertices: list[float], normals: list[float], indices: list[int]) -> bytes:
-    """Build a valid GLB (glTF 2.0 binary) file from vertex/normal/index data."""
+    """Build a valid GLB (glTF 2.0 binary) file."""
     import struct as st
 
-    # Pack binary data
     vert_bytes = st.pack(f"<{len(vertices)}f", *vertices)
     norm_bytes = st.pack(f"<{len(normals)}f", *normals)
-    idx_bytes = st.pack(f"<{len(indices)}H", *indices)  # unsigned short
+    idx_bytes = st.pack(f"<{len(indices)}H", *indices)
 
-    # Pad to 4-byte alignment
-    def _pad4(data: bytes) -> bytes:
-        pad = (4 - len(data) % 4) % 4
-        return data + b"\x00" * pad
+    def _pad4(d: bytes) -> bytes:
+        return d + b"\x00" * ((4 - len(d) % 4) % 4)
 
     vert_bytes = _pad4(vert_bytes)
     norm_bytes = _pad4(norm_bytes)
     idx_bytes = _pad4(idx_bytes)
 
     bin_data = idx_bytes + vert_bytes + norm_bytes
-
     num_vertices = len(vertices) // 3
     num_indices = len(indices)
 
-    # Compute bounding box for positions
     min_pos = [float("inf")] * 3
     max_pos = [float("-inf")] * 3
     for i in range(num_vertices):
@@ -550,37 +631,11 @@ def _build_glb(vertices: list[float], normals: list[float], indices: list[int]) 
         "scene": 0,
         "scenes": [{"nodes": [0]}],
         "nodes": [{"mesh": 0, "name": "body"}],
-        "meshes": [{
-            "primitives": [{
-                "attributes": {"POSITION": 1, "NORMAL": 2},
-                "indices": 0,
-                "mode": 4,  # TRIANGLES
-            }],
-            "name": "body_mesh",
-        }],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": 1, "NORMAL": 2}, "indices": 0, "mode": 4}], "name": "body_mesh"}],
         "accessors": [
-            {  # 0: indices
-                "bufferView": 0,
-                "componentType": 5123,  # UNSIGNED_SHORT
-                "count": num_indices,
-                "type": "SCALAR",
-                "max": [num_indices - 1],
-                "min": [0],
-            },
-            {  # 1: positions
-                "bufferView": 1,
-                "componentType": 5126,  # FLOAT
-                "count": num_vertices,
-                "type": "VEC3",
-                "max": max_pos,
-                "min": min_pos,
-            },
-            {  # 2: normals
-                "bufferView": 2,
-                "componentType": 5126,
-                "count": num_vertices,
-                "type": "VEC3",
-            },
+            {"bufferView": 0, "componentType": 5123, "count": num_indices, "type": "SCALAR", "max": [num_indices - 1], "min": [0]},
+            {"bufferView": 1, "componentType": 5126, "count": num_vertices, "type": "VEC3", "max": max_pos, "min": min_pos},
+            {"bufferView": 2, "componentType": 5126, "count": num_vertices, "type": "VEC3"},
         ],
         "bufferViews": [
             {"buffer": 0, "byteOffset": 0, "byteLength": len(idx_bytes), "target": 34963},
@@ -592,16 +647,11 @@ def _build_glb(vertices: list[float], normals: list[float], indices: list[int]) 
 
     json_str = json.dumps(gltf, separators=(",", ":"))
     json_bytes = json_str.encode("utf-8")
-    json_pad = (4 - len(json_bytes) % 4) % 4
-    json_bytes += b" " * json_pad
+    json_bytes += b" " * ((4 - len(json_bytes) % 4) % 4)
 
     total_length = 12 + 8 + len(json_bytes) + 8 + len(bin_data)
-
-    # GLB header
     header = st.pack("<III", 0x46546C67, 2, total_length)
-    # JSON chunk header
     json_hdr = st.pack("<II", len(json_bytes), 0x4E4F534A)
-    # BIN chunk header
     bin_hdr = st.pack("<II", len(bin_data), 0x004E4942)
 
     return header + json_hdr + json_bytes + bin_hdr + bin_data

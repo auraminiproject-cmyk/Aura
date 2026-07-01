@@ -96,6 +96,19 @@ class ApiClient {
     return resp.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> checkImageQuality(String imagePath) async {
+    final form = FormData.fromMap({
+      'photo': await MultipartFile.fromFile(imagePath, filename: 'check.jpg'),
+    });
+    final resp = await _dio.post('/api/v1/avatar/check-quality', data: form);
+    return resp.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getMeasurements() async {
+    final resp = await _dio.get('/api/v1/avatar/measurements');
+    return resp.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> tailoringGuide({
     required String garmentType,
     String fabric = 'silk',

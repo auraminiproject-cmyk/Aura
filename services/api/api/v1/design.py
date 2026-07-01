@@ -1,6 +1,10 @@
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from services.api.core.database import get_db
+from services.api.core.models import BodyProfile
 from services.api.core.security import get_current_user_id
 from services.vision.generate_outfit import generate_outfits
 from services.vision.tryon import virtual_tryon
@@ -21,10 +25,29 @@ class DesignResponse(BaseModel):
 
 
 @router.post("/outfits", response_model=DesignResponse)
-async def create_outfits(body: DesignRequest, _user_id: str = Depends(get_current_user_id)):
+async def create_outfits(
+    body: DesignRequest,
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Generate outfit designs using the user's body profile for personalized fit."""
+    smplx_params = body.smplx_params
+
+    # Auto-fetch stored body profile if none provided
+    if not smplx_params:
+        result = await db.execute(
+            select(BodyProfile)
+            .where(BodyProfile.user_id == user_id)
+            .order_by(BodyProfile.created_at.desc())
+            .limit(1)
+        )
+        profile = result.scalars().first()
+        if profile and profile.smplx_params:
+            smplx_params = profile.smplx_params
+
     result = await generate_outfits(
         design_brief=body.brief,
-        smplx_params=body.smplx_params,
+        smplx_params=smplx_params,
         num_variants=body.num_variants,
     )
     return DesignResponse(
