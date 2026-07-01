@@ -1,14 +1,16 @@
-"""Body reconstruction — HF pose estimation → measurement extraction → parametric mesh.
+"""Body reconstruction — VLM body analysis → HF pose → measurement extraction → parametric mesh.
 
-Production: Uses HF Inference API for pose estimation (DETR) to extract body
-landmarks, then estimates measurements from proportions + user-provided height.
-Fallback: Returns validated placeholder with basic image analysis.
+Production pipeline:
+  Tier 0: VLM (Groq Vision) analyzes body photo → extracts build type + proportions → 88% confidence
+  Tier 1: HF DETR bounding box → body width ratio → 75% confidence
+  Tier 2: Image dimension heuristic → 65% confidence
 """
 
 import base64
 import json
 import logging
 import math
+import re
 import struct
 from dataclasses import dataclass
 from io import BytesIO
@@ -18,7 +20,7 @@ import httpx
 from PIL import Image
 
 from services.api.core.config import get_settings
-from services.api.core.resilience import hf_breaker
+from services.api.core.resilience import groq_breaker, hf_breaker
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +36,63 @@ ANTHROPOMETRIC_RATIOS = {
     "torso_length": 0.300,     # torso length / height
     "neck": 0.214,             # neck circumference / height
 }
+
+# Build-type multipliers for adjusting base ratios
+BUILD_ADJUSTMENTS = {
+    "slim": {
+        "shoulder_width": 0.94, "chest": 0.90, "waist": 0.85,
+        "hip": 0.90, "neck": 0.92, "inseam": 1.02, "arm_length": 1.0, "torso_length": 1.0,
+    },
+    "average": {
+        "shoulder_width": 1.0, "chest": 1.0, "waist": 1.0,
+        "hip": 1.0, "neck": 1.0, "inseam": 1.0, "arm_length": 1.0, "torso_length": 1.0,
+    },
+    "athletic": {
+        "shoulder_width": 1.08, "chest": 1.06, "waist": 0.92,
+        "hip": 0.97, "neck": 1.04, "inseam": 1.0, "arm_length": 1.01, "torso_length": 1.0,
+    },
+    "broad": {
+        "shoulder_width": 1.10, "chest": 1.12, "waist": 1.10,
+        "hip": 1.08, "neck": 1.06, "inseam": 0.98, "arm_length": 0.99, "torso_length": 1.0,
+    },
+    "plus": {
+        "shoulder_width": 1.06, "chest": 1.18, "waist": 1.22,
+        "hip": 1.16, "neck": 1.10, "inseam": 0.97, "arm_length": 0.98, "torso_length": 1.0,
+    },
+    "hourglass": {
+        "shoulder_width": 1.02, "chest": 1.06, "waist": 0.88,
+        "hip": 1.08, "neck": 0.98, "inseam": 1.0, "arm_length": 1.0, "torso_length": 1.0,
+    },
+    "pear": {
+        "shoulder_width": 0.95, "chest": 0.96, "waist": 0.98,
+        "hip": 1.12, "neck": 0.96, "inseam": 0.99, "arm_length": 1.0, "torso_length": 1.0,
+    },
+}
+
+VLM_BODY_PROMPT = """You are a professional body measurement estimator for a fashion tailoring app.
+
+Analyze this full-body photo carefully. You MUST respond with ONLY this exact JSON format, no other text:
+
+{
+  "build_type": "<one of: slim, average, athletic, broad, plus, hourglass, pear>",
+  "shoulder_ratio": <float 0.85-1.15, how wide shoulders appear relative to average>,
+  "chest_ratio": <float 0.85-1.20, chest size relative to average>,
+  "waist_ratio": <float 0.80-1.25, waist size relative to average>,
+  "hip_ratio": <float 0.85-1.20, hip size relative to average>,
+  "limb_length": "<one of: short, average, long>",
+  "neck_thickness": "<one of: thin, average, thick>",
+  "torso_proportion": "<one of: short_torso, average, long_torso>",
+  "gender_presentation": "<one of: masculine, feminine, neutral>",
+  "estimated_weight_kg": <int, rough estimate>,
+  "notes": "<brief 1-line observation about body proportions>"
+}
+
+Rules:
+- Be precise. These ratios drive real garment cutting measurements.
+- shoulder_ratio 1.0 = average person. 1.10 = noticeably broad shoulders.
+- waist_ratio 1.0 = average. 0.85 = very slim waist. 1.20 = larger waist.
+- Look at actual visible proportions, not assumptions.
+- If the photo doesn't show a full body, estimate conservatively and note it."""
 
 
 @dataclass
@@ -52,8 +111,9 @@ async def reconstruct_body(
 ) -> BodyReconstructionResult:
     """Body reconstruction pipeline: validate → analyze → estimate measurements → mesh.
 
-    Tier 1: HF pose estimation for real body landmarks → measurement derivation.
-    Tier 2: Image dimension heuristic (height/width ratio) for rough measurements.
+    Tier 0: VLM (Groq Vision) for precise body shape analysis → 88% confidence.
+    Tier 1: HF DETR bounding box → body width ratio → 75% confidence.
+    Tier 2: Image dimension heuristic → 65% confidence.
 
     Args:
         front_image: Front photo bytes.
@@ -67,14 +127,25 @@ async def reconstruct_body(
     measurements = None
     confidence = 0.5
 
-    # Tier 1: HF Inference API for body pose estimation
-    if settings.huggingface_api_key and hf_breaker.current_state != "open":
+    # Tier 0: VLM body analysis (Groq Vision — most precise)
+    if settings.groq_api_key and groq_breaker.current_state != "open":
         try:
-            measurements, confidence = await _hf_body_analysis(
+            measurements, confidence = await _vlm_body_analysis(
                 front_image, settings, height_cm=height_cm,
             )
+            logger.info("VLM body analysis succeeded, confidence=%.2f", confidence)
         except Exception as exc:
-            logger.warning("HF body analysis failed: %s", exc)
+            logger.warning("VLM body analysis failed: %s", exc)
+
+    # Tier 1: HF Inference API for body pose estimation
+    if not measurements:
+        if settings.huggingface_api_key and hf_breaker.current_state != "open":
+            try:
+                measurements, confidence = await _hf_body_analysis(
+                    front_image, settings, height_cm=height_cm,
+                )
+            except Exception as exc:
+                logger.warning("HF body analysis failed: %s", exc)
 
     # Tier 2: Image-based heuristic estimation
     if not measurements:
@@ -94,6 +165,130 @@ async def reconstruct_body(
         confidence=confidence,
         measurements=measurements,
     )
+
+
+# ── Tier 0: VLM Body Analysis ───────────────────────────────────────────────
+
+
+async def _vlm_body_analysis(
+    image_bytes: bytes,
+    settings,
+    *,
+    height_cm: float | None = None,
+) -> tuple[dict, float]:
+    """Use Groq Vision (llama-3.2-90b-vision) to analyze body proportions."""
+    image_b64 = base64.b64encode(image_bytes).decode("ascii")
+
+    messages = [
+        {"role": "system", "content": "You are a precise body measurement estimation system."},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": VLM_BODY_PROMPT},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                },
+            ],
+        },
+    ]
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        resp = await client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+            json={
+                "model": settings.vlm_primary_model,
+                "messages": messages,
+                "temperature": 0.1,  # Low temp for precision
+                "max_tokens": 512,
+            },
+        )
+        if resp.status_code == 429:
+            groq_breaker.fail()
+            raise RuntimeError("Groq rate limited")
+        resp.raise_for_status()
+        data = resp.json()
+        groq_breaker.success()
+
+    text = data["choices"][0]["message"]["content"].strip()
+    logger.info("VLM body response: %s", text[:300])
+
+    # Parse JSON from response (handle markdown code blocks)
+    json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+    if not json_match:
+        raise ValueError("No JSON found in VLM response")
+
+    body_info = json.loads(json_match.group())
+
+    # Extract ratios from VLM analysis
+    build_type = body_info.get("build_type", "average").lower()
+    if build_type not in BUILD_ADJUSTMENTS:
+        build_type = "average"
+
+    # Get build-type base adjustments
+    build_adj = BUILD_ADJUSTMENTS[build_type]
+
+    # Override with VLM-specific ratios where provided
+    shoulder_r = body_info.get("shoulder_ratio", build_adj["shoulder_width"])
+    chest_r = body_info.get("chest_ratio", build_adj["chest"])
+    waist_r = body_info.get("waist_ratio", build_adj["waist"])
+    hip_r = body_info.get("hip_ratio", build_adj["hip"])
+
+    # Clamp ratios to reasonable ranges
+    shoulder_r = max(0.82, min(1.20, float(shoulder_r)))
+    chest_r = max(0.82, min(1.25, float(chest_r)))
+    waist_r = max(0.78, min(1.30, float(waist_r)))
+    hip_r = max(0.82, min(1.25, float(hip_r)))
+
+    # Limb length adjustment
+    limb_adj = {"short": 0.96, "average": 1.0, "long": 1.04}
+    limb_factor = limb_adj.get(body_info.get("limb_length", "average"), 1.0)
+
+    # Neck thickness
+    neck_adj = {"thin": 0.90, "average": 1.0, "thick": 1.10}
+    neck_factor = neck_adj.get(body_info.get("neck_thickness", "average"), 1.0)
+
+    # Torso proportion
+    torso_adj = {"short_torso": 0.94, "average": 1.0, "long_torso": 1.06}
+    torso_factor = torso_adj.get(body_info.get("torso_proportion", "average"), 1.0)
+
+    # Gender-based base adjustments
+    gender = body_info.get("gender_presentation", "neutral")
+    if gender == "feminine":
+        # Women tend to have wider hips, narrower shoulders
+        shoulder_r *= 0.97
+        hip_r *= 1.03
+    elif gender == "masculine":
+        # Men tend to have wider shoulders, narrower hips
+        shoulder_r *= 1.03
+        hip_r *= 0.97
+
+    base_height = height_cm or 165.0
+
+    measurements = {
+        "height_cm": round(base_height),
+        "shoulder_cm": round(base_height * ANTHROPOMETRIC_RATIOS["shoulder_width"] * shoulder_r, 1),
+        "chest_cm": round(base_height * ANTHROPOMETRIC_RATIOS["chest"] * chest_r, 1),
+        "waist_cm": round(base_height * ANTHROPOMETRIC_RATIOS["waist"] * waist_r, 1),
+        "hip_cm": round(base_height * ANTHROPOMETRIC_RATIOS["hip"] * hip_r, 1),
+        "inseam_cm": round(base_height * ANTHROPOMETRIC_RATIOS["inseam"] * limb_factor, 1),
+        "arm_length_cm": round(base_height * ANTHROPOMETRIC_RATIOS["arm_length"] * limb_factor, 1),
+        "torso_length_cm": round(base_height * ANTHROPOMETRIC_RATIOS["torso_length"] * torso_factor, 1),
+        "neck_cm": round(base_height * ANTHROPOMETRIC_RATIOS["neck"] * neck_factor, 1),
+    }
+
+    # Confidence: 0.88 with height, 0.78 without
+    conf = 0.88 if height_cm else 0.78
+
+    # Add VLM metadata to measurements for downstream use
+    measurements["_vlm_build_type"] = build_type
+    measurements["_vlm_notes"] = body_info.get("notes", "")
+
+    return measurements, conf
+
+
+# ── Tier 1: HF Body Analysis ────────────────────────────────────────────────
 
 
 def _derive_measurements_from_height(

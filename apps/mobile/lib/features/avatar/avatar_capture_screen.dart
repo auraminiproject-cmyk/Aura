@@ -477,6 +477,25 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
                         fontSize: 12,
                       ),
                     ),
+                    if (measurements['_vlm_build_type'] != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Build: ${(measurements['_vlm_build_type'] as String).toUpperCase()}',
+                            style: const TextStyle(
+                              color: Color(0xFFD4AF37),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
