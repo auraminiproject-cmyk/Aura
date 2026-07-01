@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:record/record.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:audioplayers/audioplayers.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/api_provider.dart';
 import '../../core/aura_background.dart';
@@ -19,13 +19,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <Map<String, String>>[];
-  String? _sessionId;
   final _voiceSessionId = 'voice-default';
   bool _loading = false;
-  bool _recording = false;
-  final _recorder = AudioRecorder();
   final _audioPlayer = AudioPlayer();
   late final AnimationController _typingCtrl;
+
+  // Speech-to-text
+  final SpeechToText _speech = SpeechToText();
+  bool _speechAvailable = false;
+  bool _isListening = false;
+  String _liveTranscript = '';
 
   @override
   void initState() {
@@ -34,15 +37,36 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     )..repeat();
+    _initSpeech();
+  }
+
+  Future<void> _initSpeech() async {
+    _speechAvailable = await _speech.initialize(
+      onError: (error) {
+        debugPrint('Speech error: ${error.errorMsg}');
+        if (mounted) {
+          setState(() => _isListening = false);
+        }
+      },
+      onStatus: (status) {
+        debugPrint('Speech status: $status');
+        if (status == 'done' || status == 'notListening') {
+          if (mounted && _isListening) {
+            _onSpeechDone();
+          }
+        }
+      },
+    );
+    setState(() {});
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
-    _recorder.dispose();
     _audioPlayer.dispose();
     _typingCtrl.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -58,6 +82,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     });
   }
 
+  // ── Text send (existing) ───────────────────────────────────────
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -78,24 +103,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _scrollToBottom();
 
     try {
-      final resp = await api.sendChat(
+      // Use voice converse-text for stylist persona
+      final resp = await api.voiceConverseText(
         message: text,
-        sessionId: _sessionId,
+        sessionId: _voiceSessionId,
         language: 'te',
       );
-      _sessionId = resp['session_id'] as String?;
-      final reply = resp['reply'] as String;
-      final products = resp['products'] as List?;
-      var replyText = reply;
-      if (products != null && products.isNotEmpty) {
-        replyText += '\n\n🛍 ${products.length} products matched';
-      }
-      if (resp['outfits'] != null) {
-        final variants =
-            (resp['outfits']['variants'] as List?)?.length ?? 0;
-        if (variants > 0) replyText += '\n👗 $variants outfit previews ready';
-      }
+
+      final replyText = resp['reply_text'] as String? ?? '';
       _addMessage('assistant', replyText);
+
+      // Show outfit state
+      final outfitState = resp['outfit_state'] as Map<String, dynamic>?;
+      if (outfitState != null) {
+        final stage = outfitState['stage'] as String? ?? '';
+        if (stage == 'finalized') {
+          _addMessage('assistant',
+              '✅ Outfit finalized! Your design is being generated.');
+        }
+      }
+
+      // Play reply audio if available
+      final audioUrl = resp['reply_audio_url'] as String?;
+      if (audioUrl != null && audioUrl.isNotEmpty) {
+        try {
+          await _audioPlayer.play(UrlSource(audioUrl));
+        } catch (_) {}
+      }
     } catch (e) {
       _addMessage('assistant',
           '❌ Could not reach the server.\nPlease check your connection.');
@@ -111,79 +145,65 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _scrollToBottom();
   }
 
-  Future<void> _toggleRecording() async {
-    if (_recording) {
-      final path = await _recorder.stop();
-      setState(() => _recording = false);
-
-      if (path != null) {
-        _addMessage('user', '🎤 Voice message sent…');
-        setState(() => _loading = true);
-
-        try {
-          final api = ref.read(apiClientProvider);
-          final resp = await api.voiceConverse(
-            audioPath: path,
-            sessionId: _voiceSessionId,
-            language: 'te',
-          );
-
-          // Show transcript
-          final transcript = resp['transcript'] as String? ?? '';
-          if (transcript.isNotEmpty) {
-            // Update the user message with actual transcript
-            if (_messages.isNotEmpty && _messages.last['text'] == '🎤 Voice message sent…') {
-              setState(() => _messages.last['text'] = '🎤 $transcript');
-            }
-          }
-
-          // Show reply
-          final replyText = resp['reply_text'] as String? ?? '';
-          _addMessage('assistant', replyText);
-
-          // Show outfit state if available
-          final outfitState = resp['outfit_state'] as Map<String, dynamic>?;
-          if (outfitState != null) {
-            final stage = outfitState['stage'] as String? ?? '';
-            if (stage == 'finalized') {
-              _addMessage('assistant', '✅ Outfit finalized! Tap the button below to generate your outfit image.');
-            }
-          }
-
-          // Play reply audio
-          final audioUrl = resp['reply_audio_url'] as String?;
-          if (audioUrl != null && audioUrl.isNotEmpty) {
-            try {
-              await _audioPlayer.play(UrlSource(audioUrl));
-            } catch (_) {
-              // Audio playback is best-effort
-            }
-          }
-        } catch (e) {
-          _addMessage('assistant', '❌ Voice processing failed: $e');
-        } finally {
-          setState(() => _loading = false);
-        }
-      }
+  // ── Live speech-to-text ────────────────────────────────────────
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _speech.stop();
+      _onSpeechDone();
     } else {
-      if (await _recorder.hasPermission()) {
-        // Record to a temp file
-        final tempDir = await getTemporaryDirectory();
-        final filePath = '${tempDir.path}/aura_voice_${DateTime.now().millisecondsSinceEpoch}.wav';
-        await _recorder.start(
-          const RecordConfig(encoder: AudioEncoder.wav),
-          path: filePath,
-        );
-        setState(() => _recording = true);
-      } else {
+      if (!_speechAvailable) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text(
-                    'Microphone permission denied. Please enable it in Settings.')),
+              content: Text(
+                  '🎤 Speech recognition not available. Please check microphone permissions in Settings.'),
+            ),
           );
         }
+        return;
       }
+
+      setState(() {
+        _isListening = true;
+        _liveTranscript = '';
+      });
+
+      await _speech.listen(
+        onResult: _onSpeechResult,
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+          partialResults: true,
+          cancelOnError: true,
+          autoPunctuation: true,
+        ),
+      );
+    }
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    setState(() {
+      _liveTranscript = result.recognizedWords;
+      // Update text field live
+      _controller.text = _liveTranscript;
+      _controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: _controller.text.length),
+      );
+    });
+
+    if (result.finalResult) {
+      _onSpeechDone();
+    }
+  }
+
+  void _onSpeechDone() {
+    if (!_isListening) return;
+    setState(() => _isListening = false);
+
+    final text = _liveTranscript.trim();
+    if (text.isNotEmpty) {
+      // Auto-send the transcribed text
+      _controller.text = text;
+      _send();
     }
   }
 
@@ -233,6 +253,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ),
       body: Column(
         children: [
+          // Live transcription banner
+          if (_isListening)
+            _buildListeningBanner(),
           Expanded(
             child: _messages.isEmpty
                 ? _buildEmptyState()
@@ -249,6 +272,85 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   ),
           ),
           _buildInputBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListeningBanner() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF8B1538).withValues(alpha: 0.9),
+            const Color(0xFF4A148C).withValues(alpha: 0.9),
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          // Pulsing mic icon
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.8, end: 1.2),
+            duration: const Duration(milliseconds: 600),
+            builder: (context, value, child) {
+              return Transform.scale(
+                scale: _isListening ? value : 1.0,
+                child: const Icon(Icons.mic, color: Colors.red, size: 22),
+              );
+            },
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Listening...',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (_liveTranscript.isNotEmpty)
+                  Text(
+                    _liveTranscript,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                else
+                  Text(
+                    'Speak now...',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Stop button
+          GestureDetector(
+            onTap: _toggleListening,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.stop, color: Colors.white, size: 18),
+            ),
+          ),
         ],
       ),
     );
@@ -297,7 +399,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
+          // Mic hint
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: const Color(0xFF8B1538).withValues(alpha: 0.2),
+              border: Border.all(color: const Color(0xFF8B1538).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.mic, color: Colors.white.withValues(alpha: 0.7), size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'Tap the mic to speak',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
           // Quick action chips
           Wrap(
             spacing: 8,
@@ -458,9 +581,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         top: false,
         child: Row(
           children: [
-            // Mic button with glow when recording
+            // Mic button with glow when listening
             Container(
-              decoration: _recording
+              decoration: _isListening
                   ? BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
@@ -474,13 +597,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   : null,
               child: IconButton(
                 icon: Icon(
-                  _recording ? Icons.stop_circle : Icons.mic_outlined,
-                  color: _recording
+                  _isListening ? Icons.mic : Icons.mic_outlined,
+                  color: _isListening
                       ? Colors.red
                       : Colors.white.withValues(alpha: 0.5),
+                  size: _isListening ? 28 : 24,
                 ),
-                onPressed: _toggleRecording,
-                tooltip: _recording ? 'Stop recording' : 'Voice input',
+                onPressed: _toggleListening,
+                tooltip: _isListening ? 'Stop listening' : 'Speak to AURA',
               ),
             ),
             const SizedBox(width: 4),
@@ -488,8 +612,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               child: TextField(
                 controller: _controller,
                 style: const TextStyle(color: Colors.white, fontSize: 14.5),
-                decoration: const InputDecoration(
-                  hintText: 'Ask about outfits, fabrics, styling…',
+                decoration: InputDecoration(
+                  hintText: _isListening
+                      ? 'Listening...'
+                      : 'Ask about outfits, fabrics, styling…',
                 ),
                 onSubmitted: (_) => _send(),
               ),
