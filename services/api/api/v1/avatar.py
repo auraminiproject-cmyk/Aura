@@ -121,6 +121,30 @@ async def analyze_body(
     # Run analysis
     result = await reconstruct_body(front_bytes, side_bytes, height_cm=height_cm)
 
+    # Hard-reject if confidence is too low (< 80%)
+    if result.confidence < 0.80:
+        pipeline = result.measurements.get("_pipeline", "unknown")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "low_measurement_confidence",
+                "confidence": round(result.confidence * 100),
+                "pipeline": pipeline,
+                "issues": [
+                    f"Measurement confidence is only {round(result.confidence * 100)}%.",
+                    "For accurate tailoring, we need at least 80% confidence.",
+                ],
+                "suggestion": (
+                    "Please retake your photo:\n"
+                    "• Stand upright with arms slightly away from body\n"
+                    "• Ensure good, even lighting (no harsh shadows)\n"
+                    "• Wear form-fitting clothes (avoid baggy/loose outfits)\n"
+                    "• Include full body from head to feet\n"
+                    "• Add a side photo for best results"
+                ),
+            },
+        )
+
     # Store mesh
     storage = get_storage()
     mesh_url = None
@@ -137,7 +161,7 @@ async def analyze_body(
     # Clean measurements for storage (remove _vlm_ metadata keys for DB)
     clean_measurements = {k: v for k, v in result.measurements.items() if not k.startswith("_")}
     meta = {k: v for k, v in result.measurements.items() if k.startswith("_")}
-    store_data = {**clean_measurements, "_meta": meta, "_build_type": result.build_type}
+    store_data = {**clean_measurements, "_meta": meta, "_build_type": result.build_type, "_confidence": result.confidence}
 
     # Upsert body profile — replace existing profile for this user
     existing = await db.execute(
@@ -199,6 +223,7 @@ async def get_measurements(
     measurements = profile.measurements
     build_type = measurements.pop("_build_type", "average") if isinstance(measurements, dict) else "average"
     meta = measurements.pop("_meta", {}) if isinstance(measurements, dict) else {}
+    stored_confidence = measurements.pop("_confidence", None) if isinstance(measurements, dict) else None
 
     # Re-add VLM metadata to response
     full_measurements = {**measurements, **meta}
@@ -208,7 +233,7 @@ async def get_measurements(
         profile_id=profile.id,
         measurements=full_measurements,
         build_type=build_type,
-        confidence=0.90,
+        confidence=stored_confidence,
     )
 
 

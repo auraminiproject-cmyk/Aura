@@ -219,17 +219,71 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
     } catch (e) {
       setState(() => _statusText = '');
       String msg = 'Analysis failed';
-      if (e.toString().contains('poor_image_quality')) {
-        msg = '📷 Image quality too low. Please retake the photo with better lighting.';
-      } else {
-        msg = '❌ $e';
+      final errStr = e.toString();
+
+      if (errStr.contains('poor_image_quality') || errStr.contains('low_measurement_confidence')) {
+        // Show detailed retake dialog
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF1A1A2E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Row(
+                children: [
+                  Icon(Icons.photo_camera, color: Colors.orange.shade300, size: 22),
+                  const SizedBox(width: 10),
+                  const Expanded(child: Text('Better Photo Needed', style: TextStyle(color: Colors.white, fontSize: 17))),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'For precise tailoring measurements, please:',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 13),
+                  ),
+                  const SizedBox(height: 14),
+                  _retakeTip(Icons.accessibility_new, 'Stand upright, arms slightly out'),
+                  _retakeTip(Icons.light_mode, 'Good, even lighting (no shadows)'),
+                  _retakeTip(Icons.straighten, 'Wear form-fitting clothes'),
+                  _retakeTip(Icons.crop_portrait, 'Full body: head to feet visible'),
+                  _retakeTip(Icons.person_outline, 'Add a side photo for 95%+ accuracy'),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text('Retake Front', style: TextStyle(color: Colors.orange.shade300)),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
       }
+
+      msg = '❌ $errStr';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800));
       }
     } finally {
       setState(() => _analyzing = false);
     }
+  }
+
+  Widget _retakeTip(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: [
+          Icon(icon, color: const Color(0xFFD4AF37), size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(text, style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12))),
+        ],
+      ),
+    );
   }
 
   @override
