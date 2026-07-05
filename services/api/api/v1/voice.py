@@ -250,7 +250,7 @@ async def finalize_outfit(
     image_url = None
     outfit_image_b64 = None
     try:
-        from services.vision.generate_outfit import generate_from_spec, _hf_sdxl_generate, _placeholder_png_base64
+        from services.vision.generate_outfit import generate_from_spec, _hf_sdxl_generate, _pollinations_generate, _placeholder_png_base64
         import hashlib as _hashlib
 
         # Build prompt from spec (same logic as generate_from_spec)
@@ -275,6 +275,14 @@ async def finalize_outfit(
                 _img_bytes = await _hf_sdxl_generate(_prompt, _settings)
             except Exception as e:
                 logger.warning('HF SDXL direct generation failed: %s', e)
+        
+        # Robust fallback using Pollinations (free, stable)
+        if not _img_bytes or len(_img_bytes) < 500:
+            try:
+                _img_bytes = await _pollinations_generate(_prompt)
+            except Exception as e:
+                logger.warning('Pollinations fallback failed: %s', e)
+
         if not _img_bytes or len(_img_bytes) < 500:
             _seed = _hashlib.sha256(_prompt.encode()).hexdigest()
             _img_bytes = base64.b64decode(_placeholder_png_base64(_seed))

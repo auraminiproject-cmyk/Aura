@@ -93,7 +93,7 @@ async def generate_outfits(
     )
 
 
-async def _hf_sdxl_generate(prompt: str, settings) -> bytes | None:
+async def _hf_sdxl_generate(prompt: str, settings: Any) -> bytes | None:
     """Call HF Inference API for SDXL image generation."""
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
@@ -122,6 +122,21 @@ async def _hf_sdxl_generate(prompt: str, settings) -> bytes | None:
             return None
         hf_breaker.success()
         return resp.content
+
+
+async def _pollinations_generate(prompt: str) -> bytes | None:
+    """Generate image using pollinations.ai (Free, no key required)."""
+    import urllib.parse
+    encoded_prompt = urllib.parse.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&nologo=true"
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(url, headers={"User-Agent": "Aura-Fashion-AI/1.0"})
+            if resp.status_code == 200:
+                return resp.content
+    except Exception as exc:
+        logger.warning("Pollinations generation failed: %s", exc)
+    return None
 
 
 def _placeholder_png_base64(seed: str) -> str:
