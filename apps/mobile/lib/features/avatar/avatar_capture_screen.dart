@@ -552,7 +552,24 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
 
   Widget _buildResultsCard(Map<String, dynamic> measurements, double? confidence, String? buildType) {
     final confidencePct = ((confidence ?? 0.5) * 100).toInt();
-    final isHighConf = confidencePct >= 80;
+    // 3-tier confidence display
+    final Color confColor;
+    final IconData confIcon;
+    final String confLabel;
+    if (confidencePct >= 75) {
+      confColor = Colors.green.shade300;
+      confIcon = Icons.verified;
+      confLabel = '$confidencePct% Confidence • AI Verified';
+    } else if (confidencePct >= 55) {
+      confColor = Colors.amber.shade300;
+      confIcon = Icons.check_circle_outline;
+      confLabel = '$confidencePct% Confidence • Good Estimate';
+    } else {
+      confColor = Colors.orange.shade300;
+      confIcon = Icons.info_outline;
+      confLabel = '$confidencePct% Confidence • Approximate';
+    }
+    final isHighConf = confidencePct >= 55; // Used for border styling
     final bt = buildType ?? measurements['_vlm_build_type'] as String? ?? 'average';
 
     return Container(
@@ -574,13 +591,10 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: isHighConf ? const Color(0xFF2E7D32).withValues(alpha: 0.2) : const Color(0xFFE65100).withValues(alpha: 0.2),
+                  color: confColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  isHighConf ? Icons.verified : Icons.info_outline,
-                  color: isHighConf ? Colors.green.shade300 : Colors.orange.shade300, size: 20,
-                ),
+                child: Icon(confIcon, color: confColor, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -588,10 +602,7 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text('Your Measurements', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text(
-                      '$confidencePct% Confidence${isHighConf ? " • AI Verified" : ""}',
-                      style: TextStyle(color: isHighConf ? Colors.green.shade300 : Colors.orange.shade300, fontSize: 12),
-                    ),
+                    Text(confLabel, style: TextStyle(color: confColor, fontSize: 12)),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -616,7 +627,7 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
             child: LinearProgressIndicator(
               value: confidence ?? 0.5,
               backgroundColor: Colors.white.withValues(alpha: 0.1),
-              valueColor: AlwaysStoppedAnimation(isHighConf ? Colors.green.shade400 : Colors.orange.shade400),
+              valueColor: AlwaysStoppedAnimation(confColor),
               minHeight: 4,
             ),
           ),

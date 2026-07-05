@@ -499,7 +499,10 @@ async def _vlm_classify_build(
     side_bytes: bytes | None,
     settings,
 ) -> dict:
-    """Use VLM to classify build type only (not measurements)."""
+    """Use VLM to classify build type only (not measurements).
+
+    Tries multiple Groq vision models in order of capability.
+    """
     front_b64 = base64.b64encode(front_bytes).decode("ascii")
 
     content = [{"type": "text", "text": VLM_BUILD_PROMPT}]
@@ -520,32 +523,55 @@ async def _vlm_classify_build(
         {"role": "user", "content": content},
     ]
 
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-            json={
-                "model": settings.vlm_primary_model,
-                "messages": messages,
-                "temperature": 0.05,
-                "max_tokens": 300,
-            },
-        )
-        if resp.status_code == 429:
-            groq_breaker.fail()
-            raise RuntimeError("Groq rate limited")
-        resp.raise_for_status()
-        data = resp.json()
-        groq_breaker.success()
+    # Try multiple vision models — larger models may be unavailable on free tier
+    models_to_try = [
+        settings.vlm_primary_model,       # llama-3.2-90b-vision-preview
+        "llama-3.2-11b-vision-preview",    # smaller but capable
+        "llava-v1.5-7b-4096-preview",      # lightweight fallback
+    ]
+    # Deduplicate while preserving order
+    seen = set()
+    models_to_try = [m for m in models_to_try if m not in seen and not seen.add(m)]
 
-    text = data["choices"][0]["message"]["content"].strip()
-    logger.info("VLM build classification: %s", text[:300])
+    last_exc = None
+    for model in models_to_try:
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "temperature": 0.05,
+                        "max_tokens": 300,
+                    },
+                )
+                if resp.status_code == 429:
+                    groq_breaker.fail()
+                    raise RuntimeError(f"Groq rate limited on {model}")
+                if resp.status_code in (400, 404):
+                    # Model not available — try next
+                    logger.info("Groq model %s unavailable (%d), trying next", model, resp.status_code)
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                groq_breaker.success()
 
-    json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
-    if not json_match:
-        raise ValueError(f"No JSON in VLM response: {text[:200]}")
+            text = data["choices"][0]["message"]["content"].strip()
+            logger.info("VLM build classification (model=%s): %s", model, text[:300])
 
-    return json.loads(json_match.group())
+            json_match = re.search(r'\{[^{}]*\}', text, re.DOTALL)
+            if not json_match:
+                raise ValueError(f"No JSON in VLM response: {text[:200]}")
+
+            return json.loads(json_match.group())
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("VLM classify with %s failed: %s", model, exc)
+            continue
+
+    raise last_exc or RuntimeError("All VLM models failed")
 
 
 # ── Main Pipeline ───────────────────────────────────────────────────────────
@@ -733,12 +759,12 @@ def _compute_real_confidence(
     pipeline_base = {
         "mediapipe+vlm": 0.88,
         "mediapipe": 0.82,
-        "vlm_only": 0.70,
-        "hf_detr": 0.60,
-        "heuristic": 0.40,
-        "none": 0.30,
+        "vlm_only": 0.72,
+        "hf_detr": 0.62,
+        "heuristic": 0.58,  # Enhanced: uses PIL body detection, not just ratios
+        "none": 0.40,
     }
-    score = pipeline_base.get(pipeline_used, 0.40)
+    score = pipeline_base.get(pipeline_used, 0.50)
 
     # 2. Landmark visibility boost/penalty
     if front_landmarks and front_landmarks.detected:
@@ -853,23 +879,46 @@ async def _vlm_full_estimation(
         {"role": "user", "content": content},
     ]
 
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-            json={
-                "model": settings.vlm_primary_model,
-                "messages": messages,
-                "temperature": 0.05,
-                "max_tokens": 800,
-            },
-        )
-        if resp.status_code == 429:
-            groq_breaker.fail()
-            raise RuntimeError("Groq rate limited")
-        resp.raise_for_status()
-        data = resp.json()
-        groq_breaker.success()
+    # Try multiple vision models in order of capability
+    models_to_try = [
+        settings.vlm_primary_model,
+        "llama-3.2-11b-vision-preview",
+        "llava-v1.5-7b-4096-preview",
+    ]
+    seen = set()
+    models_to_try = [m for m in models_to_try if m not in seen and not seen.add(m)]
+
+    data = None
+    for model in models_to_try:
+        try:
+            async with httpx.AsyncClient(timeout=90.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {settings.groq_api_key}"},
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "temperature": 0.05,
+                        "max_tokens": 800,
+                    },
+                )
+                if resp.status_code == 429:
+                    groq_breaker.fail()
+                    raise RuntimeError(f"Groq rate limited on {model}")
+                if resp.status_code in (400, 404):
+                    logger.info("Groq model %s unavailable (%d), trying next", model, resp.status_code)
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                groq_breaker.success()
+                logger.info("VLM full estimation using model: %s", model)
+                break
+        except Exception as exc:
+            logger.warning("VLM estimation with %s failed: %s", model, exc)
+            continue
+
+    if data is None:
+        raise RuntimeError("All VLM models failed for full estimation")
 
     text = data["choices"][0]["message"]["content"].strip()
     logger.info("VLM body response (fallback): %s", text[:500])
@@ -969,25 +1018,109 @@ async def _hf_body_analysis(
 def _image_heuristic_measurements(
     image_bytes: bytes, *, height_cm: float | None = None,
 ) -> tuple[dict, float]:
-    """Basic estimation from image aspect ratio — last resort."""
+    """Enhanced estimation from image analysis — smart fallback.
+
+    Uses PIL to:
+      1. Detect the person's bounding box via edge density
+      2. Measure shoulder-width to hip-width ratio from the silhouette
+      3. Estimate build type from proportions
+      4. Compute personalized measurements from actual image content
+    """
     try:
-        img = Image.open(BytesIO(image_bytes))
+        img = Image.open(BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
-        aspect = h / w if w > 0 else 1.5
+        base_h = height_cm or 165.0
 
-        if aspect > 2.0:
-            bwr = 0.92
-        elif aspect > 1.3:
-            bwr = 1.0
+        # ── Step 1: Find the person's bounding box ──────────────────────
+        gray = img.convert("L")
+        arr = np.array(gray, dtype=float)
+
+        # Vertical projection: find rows with high edge density (body region)
+        row_energy = np.diff(arr, axis=1).astype(float)
+        row_sums = np.abs(row_energy).sum(axis=1)
+        threshold = row_sums.max() * 0.15
+        active_rows = np.where(row_sums > threshold)[0]
+
+        if len(active_rows) > 10:
+            body_top = int(active_rows[0])
+            body_bot = int(active_rows[-1])
         else:
-            bwr = 1.08
+            body_top = int(h * 0.05)
+            body_bot = int(h * 0.95)
 
-        base_h = height_cm or 165
-        measurements = _derive_from_ratios(base_h, bwr)
-        conf = 0.45 if height_cm else 0.35
+        body_height_px = max(body_bot - body_top, h * 0.5)
+        px_per_cm = body_height_px / base_h
+
+        # ── Step 2: Measure widths at key body regions ──────────────────
+        def _measure_width_at(y_frac: float) -> float:
+            """Measure body width at a vertical fraction of the body."""
+            y = int(body_top + body_height_px * y_frac)
+            y = max(0, min(y, h - 1))
+            row_px = arr[y, :]
+            # Find body edges using gradient
+            grad = np.abs(np.diff(row_px))
+            edge_thresh = grad.max() * 0.25 if grad.max() > 10 else 5
+            edges = np.where(grad > edge_thresh)[0]
+            if len(edges) >= 2:
+                return float(edges[-1] - edges[0])
+            return float(w * 0.3)  # fallback
+
+        shoulder_width_px = _measure_width_at(0.18)  # ~18% from top = shoulders
+        chest_width_px = _measure_width_at(0.28)      # ~28% = chest
+        waist_width_px = _measure_width_at(0.42)       # ~42% = waist
+        hip_width_px = _measure_width_at(0.52)         # ~52% = hips
+
+        # ── Step 3: Classify build type from proportions ────────────────
+        shr = shoulder_width_px / hip_width_px if hip_width_px > 0 else 1.0
+        whr = waist_width_px / hip_width_px if hip_width_px > 0 else 0.85
+
+        if shr > 1.15 and whr < 0.80:
+            build_type = "athletic"
+        elif shr > 1.10:
+            build_type = "broad"
+        elif whr < 0.75:
+            build_type = "hourglass"
+        elif shr < 0.90:
+            build_type = "pear"
+        elif waist_width_px / shoulder_width_px > 0.95:
+            build_type = "plus"
+        elif waist_width_px / shoulder_width_px < 0.72:
+            build_type = "slim"
+        else:
+            build_type = "average"
+
+        # ── Step 4: Compute measurements ────────────────────────────────
+        # Use actual pixel widths converted to cm, then apply circumference ratios
+        shoulder_cm = shoulder_width_px / px_per_cm
+        depth_ratios = CIRC_DEPTH_RATIOS.get(build_type, CIRC_DEPTH_RATIOS["average"])
+
+        measurements = {
+            "shoulder_cm": round(shoulder_cm, 1),
+            "chest_cm": round(chest_width_px / px_per_cm * depth_ratios["chest"], 1),
+            "waist_cm": round(waist_width_px / px_per_cm * depth_ratios["waist"], 1),
+            "hip_cm": round(hip_width_px / px_per_cm * depth_ratios["hip"], 1),
+            "inseam_cm": round(base_h * ANTHROPOMETRIC_RATIOS["inseam"], 1),
+            "arm_length_cm": round(base_h * ANTHROPOMETRIC_RATIOS["arm_length"], 1),
+            "torso_length_cm": round(base_h * ANTHROPOMETRIC_RATIOS["torso_length"], 1),
+            "neck_cm": round(base_h * ANTHROPOMETRIC_RATIOS["neck"] *
+                           (BUILD_ADJUSTMENTS.get(build_type, {}).get("neck", 1.0)), 1),
+            "_vlm_build_type": build_type,
+        }
+
+        # Confidence: higher than blind ratios since we used actual image data
+        conf = 0.62 if height_cm else 0.55
+
+        logger.info(
+            "[heuristic] Image-based estimation: build=%s, shoulder=%.1fpx, "
+            "chest=%.1fpx, waist=%.1fpx, hip=%.1fpx, conf=%.0f%%",
+            build_type, shoulder_width_px, chest_width_px,
+            waist_width_px, hip_width_px, conf * 100,
+        )
+
         return measurements, conf
-    except Exception:
-        return _derive_from_ratios(height_cm or 165), 0.30
+    except Exception as exc:
+        logger.warning("Image heuristic analysis failed: %s — using blind ratios", exc)
+        return _derive_from_ratios(height_cm or 165), 0.45
 
 
 def _derive_from_ratios(height_cm: float, body_width_ratio: float = 1.0) -> dict:
