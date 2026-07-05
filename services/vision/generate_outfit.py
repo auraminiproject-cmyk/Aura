@@ -93,7 +93,7 @@ async def generate_outfits(
     )
 
 
-async def _hf_sdxl_generate(prompt: str, settings: Any) -> bytes | None:
+async def _hf_sdxl_generate(prompt: str, settings) -> bytes | None:
     """Call HF Inference API for SDXL image generation."""
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(
