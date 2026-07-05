@@ -64,7 +64,7 @@ Then give the actual recommendation — warm, specific, actionable.
 - If constraints conflict, explain the trade-off and your reasoning
 - KEEP SPOKEN REPLIES CONCISE (3-5 sentences after thinking) — this will be TTS'd
 - NEVER give generic advice — every word must be unique to THIS client
-- NEVER say you are an AI or a text-based model. If the client asks to see the outfit, generate an image, or try it on, agree enthusiastically and use the word "finalize" to trigger the visual generation pipeline.
+- NEVER describe the visual appearance as if you are generating an image (e.g. do not say "**Outfit Visualization:** You're wearing..."). The visual generation pipeline will create a REAL image automatically when you output the JSON block!
 
 ═══ LANGUAGE MIRRORING ═══
 {language_instruction}
@@ -132,21 +132,21 @@ async def reason(
     if plan_goal:
         system += f"\n\n═══ CURRENT CONVERSATION GOAL ═══\nYour primary objective for this turn is: {plan_goal}\n"
 
-    if wants_finalize:
-        system += (
-            "\n\n═══ FINALIZATION MODE ═══\n"
-            "The client wants to FINALIZE. After your <think> reasoning, output the final "
-            "outfit spec as a JSON block wrapped in ```json ... ``` with these exact keys:\n"
-            "{\n"
-            '  "garment_type": "...",\n'
-            '  "fabric": "specific fabric name",\n'
-            '  "color": "specific color",\n'
-            '  "silhouette": "...",\n'
-            '  "style_notes": "...",\n'
-            '  "occasion": "...",\n'
-            '  "budget_inr": 0\n'
-            "}\n"
-        )
+    system += (
+        "\n\n═══ HOW TO FINALIZE ═══\n"
+        "When the client agrees to an outfit, or asks to see an image/try it on, you MUST finalize the design.\n"
+        "To finalize, agree enthusiastically, and then output the final outfit spec as a JSON block wrapped in ```json ... ``` with these exact keys:\n"
+        "{\n"
+        '  "garment_type": "...",\n'
+        '  "fabric": "specific fabric name",\n'
+        '  "color": "specific color",\n'
+        '  "silhouette": "...",\n'
+        '  "style_notes": "...",\n'
+        '  "occasion": "...",\n'
+        '  "budget_inr": 0\n'
+        "}\n"
+        "DO NOT output this JSON block unless you are finalizing the outfit in this turn. Once you output this JSON, the visual generation pipeline will automatically trigger.\n"
+    )
 
     # Build messages
     messages: list[dict[str, str]] = [{"role": "system", "content": system}]
@@ -182,9 +182,12 @@ async def reason(
 
 
 def strip_think_blocks(text: str) -> str:
-    """Remove <think>...</think> blocks from LLM output for TTS."""
+    """Remove <think>...</think> blocks and JSON blocks from LLM output for TTS."""
     # Remove think blocks (including multiline)
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE)
+    # Remove JSON blocks
+    cleaned = re.sub(r"```json.*?```", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r"\{[^{}]*\"garment_type\"[^{}]*\}", "", cleaned, flags=re.DOTALL | re.IGNORECASE)
     # Clean up extra whitespace
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
     return cleaned

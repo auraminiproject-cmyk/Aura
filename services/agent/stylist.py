@@ -293,7 +293,11 @@ async def stylist_respond(
         full_reply = reply
 
     # Update state based on conversation
-    if wants_finalize:
+    import re
+    has_json_block = bool(re.search(r"```json\s*(\{.*?\})\s*```", full_reply, re.DOTALL)) or \
+                     bool(re.search(r"\{[^{}]*\"garment_type\"[^{}]*\}", full_reply, re.DOTALL))
+
+    if wants_finalize or has_json_block:
         new_spec = _extract_spec_from_reply(full_reply, session.spec)
         session.spec = new_spec
         if new_spec.is_complete():
