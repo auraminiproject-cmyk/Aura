@@ -347,15 +347,20 @@ async def finalize_outfit(
                 except Exception:
                     pass
 
+        garment_image_bytes = base64.b64decode(outfit_image_b64) if outfit_image_b64 else None
+
         tryon_bytes, tryon_engine = await generate_tryon_image(
             spec=spec,
             person_image_bytes=person_image_bytes,
+            garment_image_bytes=garment_image_bytes,
             body_analysis=body_analysis,
         )
         if tryon_bytes and len(tryon_bytes) > 500:
             tryon_image_b64 = base64.b64encode(tryon_bytes).decode('ascii')
             logger.info('[finalize] Try-on image generated via %s (%d bytes)',
                         tryon_engine, len(tryon_bytes))
+            outfit_image_b64 = None
+            image_url = None
     except Exception as exc:
         logger.warning('Virtual try-on failed (non-blocking): %s', exc)
 
