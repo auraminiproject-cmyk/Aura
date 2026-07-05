@@ -1,6 +1,7 @@
-"""Voice conversation endpoint — Sarvam ASR → Stylist LLM → Sarvam TTS.
+"""Voice conversation endpoint — Groq Whisper ASR → Stylist LLM → Sarvam TTS.
 
 POST /api/v1/voice/converse: Full voice loop for outfit negotiation.
+POST /api/v1/voice/converse-text: Text-based fallback.
 POST /api/v1/voice/finalize: Finalize outfit → generate image → save to wardrobe.
 """
 
@@ -16,7 +17,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from services.api.core.database import get_db
 from services.api.core.models import BodyProfile, WardrobeItem
 from services.api.core.security import get_current_user_id
-from services.api.core.storage import get_storage
 from services.api.services.sarvam_client import (
     synthesize_with_fallback,
     transcribe_with_fallback,
@@ -36,7 +36,10 @@ router = APIRouter()
 class ConverseResponse(BaseModel):
     transcript: str
     reply_text: str
-    reply_audio_url: str | None
+    reply_audio_b64: str | None
+    detected_language: str
+    asr_engine: str
+    tts_engine: str
     outfit_state: dict
 
 
@@ -44,14 +47,15 @@ class ConverseResponse(BaseModel):
 async def voice_converse(
     audio: UploadFile = File(...),
     session_id: str = Form("default"),
-    language: str = Form("te"),
+    language: str = Form(""),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
     """Full voice conversation loop: ASR → LLM stylist → TTS → response.
 
     Accepts audio blob + session_id, returns transcript, reply text,
-    reply audio URL, and current outfit negotiation state.
+    reply audio as base64, detected language, and engine info.
+    Language is auto-detected if not provided.
     """
     # Read and validate audio
     audio_bytes = await audio.read()
@@ -60,10 +64,19 @@ async def voice_converse(
     if len(audio_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Audio too large (max 10MB)")
 
-    # Step 1: ASR — Sarvam Saarika (fallback: Whisper)
-    transcript = await transcribe_with_fallback(audio_bytes, language)
+    # Step 1: ASR — Groq Whisper (primary) → Sarvam → HF Whisper
+    try:
+        transcript, detected_lang, asr_engine = await transcribe_with_fallback(
+            audio_bytes, language=language if language else None,
+        )
+    except RuntimeError:
+        raise HTTPException(status_code=500, detail="All ASR engines failed — could not transcribe")
+
     if not transcript or len(transcript.strip()) < 2:
         raise HTTPException(status_code=400, detail="Could not transcribe audio")
+
+    logger.info("[voice/converse] ASR engine=%s, lang=%s, transcript=%s...",
+                asr_engine, detected_lang, transcript[:60])
 
     # Step 2: Fetch body profile for this user (if exists)
     body_profile = None
@@ -80,32 +93,33 @@ async def voice_converse(
     except Exception:
         pass  # body profile is optional
 
-    # Step 3: Stylist LLM — negotiate outfit
+    # Step 3: Stylist LLM — negotiate outfit (with detected language)
     reply_text, outfit_state = await stylist_respond(
         transcript=transcript,
         body_profile=body_profile,
         session_id=session_id,
+        detected_language=detected_lang,
     )
 
-    # Step 4: TTS — Sarvam Bulbul (fallback: Kokoro/HF MMS)
-    reply_audio_url = None
+    # Step 4: TTS — Sarvam Bulbul v3 (primary) → HF MMS (fallback)
+    reply_audio_b64 = None
+    tts_engine = "none"
     try:
-        audio_out = await synthesize_with_fallback(reply_text, language)
+        audio_out, tts_engine = await synthesize_with_fallback(reply_text, language=detected_lang)
         if audio_out and len(audio_out) > 100:
-            storage = get_storage()
-            audio_key = f"voice/{user_id}/{session_id}/{uuid.uuid4().hex}.wav"
-            reply_audio_url = await storage.upload_bytes(
-                audio_out,
-                key=audio_key,
-                content_type="audio/wav",
-            )
+            reply_audio_b64 = base64.b64encode(audio_out).decode("ascii")
+            logger.info("[voice/converse] TTS engine=%s, audio_size=%d bytes",
+                        tts_engine, len(audio_out))
     except Exception as exc:
-        logger.warning("TTS/storage failed: %s", exc)
+        logger.warning("[voice/converse] TTS failed: %s", exc)
 
     return ConverseResponse(
         transcript=transcript,
         reply_text=reply_text,
-        reply_audio_url=reply_audio_url,
+        reply_audio_b64=reply_audio_b64,
+        detected_language=detected_lang,
+        asr_engine=asr_engine,
+        tts_engine=tts_engine,
         outfit_state=outfit_state,
     )
 
@@ -123,7 +137,7 @@ async def voice_converse_text(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Text-based stylist conversation (no audio, for testing/fallback)."""
+    """Text-based stylist conversation — also generates TTS audio for the reply."""
     # Fetch body profile
     body_profile = None
     try:
@@ -143,12 +157,26 @@ async def voice_converse_text(
         transcript=body.message,
         body_profile=body_profile,
         session_id=body.session_id,
+        detected_language=body.language,
     )
+
+    # Generate TTS for text conversations too (app should speak)
+    reply_audio_b64 = None
+    tts_engine = "none"
+    try:
+        audio_out, tts_engine = await synthesize_with_fallback(reply_text, language=body.language)
+        if audio_out and len(audio_out) > 100:
+            reply_audio_b64 = base64.b64encode(audio_out).decode("ascii")
+    except Exception as exc:
+        logger.warning("[voice/converse-text] TTS failed: %s", exc)
 
     return {
         "transcript": body.message,
         "reply_text": reply_text,
-        "reply_audio_url": None,
+        "reply_audio_b64": reply_audio_b64,
+        "detected_language": body.language,
+        "asr_engine": "text_input",
+        "tts_engine": tts_engine,
         "outfit_state": outfit_state,
     }
 

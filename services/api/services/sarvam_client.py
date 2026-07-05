@@ -1,7 +1,8 @@
-"""Sarvam AI client — ASR (Saarika) + TTS (Bulbul) for Indic voice.
+"""Sarvam AI client — ASR (Saaras v3) + TTS (Bulbul v3) for Indic voice.
 
-Primary voice engine for Telugu/Hindi/English code-mixed speech.
-Falls back to existing Whisper ASR / MMS TTS when Sarvam is unavailable.
+Primary TTS engine for Telugu/Hindi/English code-mixed speech.
+ASR is secondary (Groq Whisper is primary for ASR).
+Falls back to HF Whisper ASR / HF MMS TTS when both Groq and Sarvam are unavailable.
 """
 
 import base64
@@ -24,29 +25,60 @@ SARVAM_LANG_MAP = {
     "te-IN": "te-IN",
     "hi-IN": "hi-IN",
     "en-IN": "en-IN",
+    # Whisper returns full language names — map those too
+    "telugu": "te-IN",
+    "hindi": "hi-IN",
+    "english": "en-IN",
 }
 
-# TTS speaker voices available in Bulbul
+# TTS speaker voices available in Bulbul v3
 SARVAM_SPEAKERS = {
     "te": "meera",   # Telugu female
     "hi": "meera",   # Hindi female
     "en": "meera",   # English female
+    "te-IN": "meera",
+    "hi-IN": "meera",
+    "en-IN": "meera",
+    "telugu": "meera",
+    "hindi": "meera",
+    "english": "meera",
+}
+
+# Map Whisper's detected language to our short codes
+WHISPER_LANG_TO_SHORT = {
+    "telugu": "te",
+    "hindi": "hi",
+    "english": "en",
+    "te": "te",
+    "hi": "hi",
+    "en": "en",
+    "te-in": "te",
+    "hi-in": "hi",
+    "en-in": "en",
 }
 
 
-async def sarvam_asr(audio_bytes: bytes, language: str = "te") -> str | None:
-    """Transcribe audio using Sarvam Saarika ASR.
+def normalize_language(lang: str | None) -> str:
+    """Normalize any language identifier to our short code (te/hi/en)."""
+    if not lang:
+        return "hi"  # default to Hindi
+    lang_lower = lang.lower().strip()
+    return WHISPER_LANG_TO_SHORT.get(lang_lower, "hi")
+
+
+async def sarvam_asr(audio_bytes: bytes, language: str = "te") -> tuple[str | None, str | None]:
+    """Transcribe audio using Sarvam Saaras v3 ASR.
 
     Args:
         audio_bytes: Raw audio bytes (WAV/MP3/WebM).
         language: Language code (te/hi/en or te-IN/hi-IN/en-IN).
 
     Returns:
-        Transcribed text, or None on failure (caller should fall back).
+        Tuple of (transcript, detected_language_short) — both None on failure.
     """
     settings = get_settings()
     if not settings.sarvam_api_key:
-        return None
+        return None, None
 
     lang_code = SARVAM_LANG_MAP.get(language, "hi-IN")
 
@@ -64,31 +96,32 @@ async def sarvam_asr(audio_bytes: bytes, language: str = "te") -> str | None:
                 json={
                     "input": audio_b64,
                     "language_code": lang_code,
-                    "model": "saarika:v2",
+                    "model": "saaras:v3",
                     "with_timestamps": False,
                 },
             )
             if resp.status_code != 200:
                 logger.warning("Sarvam ASR returned %d: %s", resp.status_code, resp.text[:200])
-                return None
+                return None, None
 
             data = resp.json()
             transcript = data.get("transcript", "")
+            detected = normalize_language(language)
             if transcript:
-                logger.info("Sarvam ASR success (%s): %s...", lang_code, transcript[:60])
-                return transcript
-            return None
+                logger.info("[ASR:sarvam] success (%s): %s...", lang_code, transcript[:60])
+                return transcript, detected
+            return None, None
 
     except Exception as exc:
         logger.warning("Sarvam ASR failed: %s", exc)
-        return None
+        return None, None
 
 
 async def sarvam_tts(text: str, language: str = "te") -> bytes | None:
-    """Synthesize speech using Sarvam Bulbul TTS.
+    """Synthesize speech using Sarvam Bulbul v3 TTS.
 
     Args:
-        text: Text to synthesize (max ~500 chars for free tier).
+        text: Text to synthesize (max ~2500 chars for v3).
         language: Target language code.
 
     Returns:
@@ -110,10 +143,10 @@ async def sarvam_tts(text: str, language: str = "te") -> bytes | None:
                     "Content-Type": "application/json",
                 },
                 json={
-                    "inputs": [text[:500]],
+                    "inputs": [text[:2500]],
                     "target_language_code": lang_code,
                     "speaker": speaker,
-                    "model": "bulbul:v1",
+                    "model": "bulbul:v2",
                     "enable_preprocessing": True,
                 },
             )
@@ -127,7 +160,7 @@ async def sarvam_tts(text: str, language: str = "te") -> bytes | None:
             if audios and len(audios) > 0:
                 audio_b64 = audios[0]
                 audio_bytes = base64.b64decode(audio_b64)
-                logger.info("Sarvam TTS success (%s), %d bytes", lang_code, len(audio_bytes))
+                logger.info("[TTS:sarvam] success (%s), %d bytes", lang_code, len(audio_bytes))
                 return audio_bytes
             return None
 
@@ -136,28 +169,62 @@ async def sarvam_tts(text: str, language: str = "te") -> bytes | None:
         return None
 
 
-async def transcribe_with_fallback(audio_bytes: bytes, language: str = "te") -> str:
-    """Transcribe audio: Sarvam first, then existing Whisper fallback."""
-    # Try Sarvam first
-    transcript = await sarvam_asr(audio_bytes, language)
+async def transcribe_with_fallback(
+    audio_bytes: bytes,
+    language: str | None = None,
+) -> tuple[str, str, str]:
+    """Transcribe audio: Groq Whisper → Sarvam → HF Whisper (NO mock fallback).
+
+    Returns:
+        Tuple of (transcript, detected_language_short, engine_used).
+        Raises HTTPException if all engines fail.
+    """
+    # Tier 1: Groq Whisper (primary — uses existing GROQ_API_KEY)
+    from services.api.services.groq_asr import groq_whisper_asr
+
+    transcript, detected = await groq_whisper_asr(audio_bytes, language)
     if transcript:
-        return transcript
+        lang_short = normalize_language(detected)
+        return transcript, lang_short, "groq_whisper"
 
-    # Fallback to existing Whisper/HF ASR
+    # Tier 2: Sarvam Saaras v3
+    lang_hint = language or "hi"
+    transcript, detected = await sarvam_asr(audio_bytes, lang_hint)
+    if transcript:
+        return transcript, detected or normalize_language(lang_hint), "sarvam_saaras"
+
+    # Tier 3: HF Whisper (genuine last resort — no mock)
     from services.api.services.asr import transcribe_audio
-    return await transcribe_audio(audio_bytes, language=language)
+
+    transcript = await transcribe_audio(audio_bytes, language=language)
+    if transcript and transcript.strip():
+        return transcript, normalize_language(language), "hf_whisper"
+
+    # All failed — explicit failure, never a mock
+    raise RuntimeError("All ASR engines failed — no transcript available")
 
 
-async def synthesize_with_fallback(text: str, language: str = "te") -> bytes | None:
-    """Synthesize speech: Sarvam first, then existing TTS fallback."""
-    # Try Sarvam first
+async def synthesize_with_fallback(
+    text: str,
+    language: str = "te",
+) -> tuple[bytes | None, str]:
+    """Synthesize speech: Sarvam Bulbul v3 → HF MMS TTS (NO silent placeholder).
+
+    Returns:
+        Tuple of (audio_bytes, engine_used). audio_bytes may be None if all fail.
+    """
+    # Tier 1: Sarvam Bulbul v3 (primary)
     audio = await sarvam_tts(text, language)
     if audio:
-        return audio
+        return audio, "sarvam_bulbul"
 
-    # Fallback to existing TTS (Kokoro / HF MMS)
+    # Tier 2: HF MMS TTS (genuine fallback)
     from services.api.services.tts import synthesize_speech
+
     result_b64 = await synthesize_speech(text, language=language)
     if result_b64:
-        return base64.b64decode(result_b64)
-    return None
+        return base64.b64decode(result_b64), "hf_mms_tts"
+
+    # All failed — log explicitly, return None (caller must handle)
+    logger.error("[TTS] All engines failed for lang=%s, text_len=%d", language, len(text))
+    return None, "none"

@@ -105,12 +105,23 @@ FINALIZE_KEYWORDS = [
 STYLIST_SYSTEM_PROMPT = """You are AURA, an elite fashion designer with 25+ years of expertise in Indian couture, 
 ethnic wear, and contemporary fusion. You have dressed Bollywood celebrities and royal families.
 
+═══ LANGUAGE & EMOTION MIRRORING (MOST IMPORTANT RULE) ═══
+You MUST reply in the EXACT SAME language the client used:
+- If they speak Telugu → reply in Telugu (with natural English words mixed in where Indians normally do)
+- If they speak Hindi → reply in Hindi (same natural code-mixing)
+- If they speak English → reply in English
+- If they code-mix (Tenglish/Hinglish/Tinglish) → you code-mix the SAME way
+- NEVER switch to a different language than what the client used
+- Match their emotional energy: excited → you get excited, casual → you stay casual, formal → be polished
+- Keep responses CONCISE (2-4 sentences max) — this will be spoken aloud via TTS, not read
+- Use natural conversational speech patterns, not literary/formal writing
+
 Your personality:
 - Confident, opinionated, but warm. You ARGUE for your design choices with expertise.
 - You push back when clients make poor choices (wrong fabric for occasion, bad color for skin tone).
-- You suggest alternatives with passion: "Darling, that would wash you out. Let me show you..."
+- You suggest alternatives with passion and flair.
 - You know Indian regional traditions deeply: Kanjeevaram for Tamil weddings, Banarasi for UP, Pochampally for Telangana.
-- You speak the client's language (Telugu/Hindi/English code-mixed).
+- You naturally use the client's regional expressions and slang.
 
 Your process:
 1. PROPOSING: Ask about occasion, preferences, body type. Make an initial bold proposal.
@@ -122,6 +133,7 @@ CRITICAL RULES:
 - Give specific fabric recommendations (not just "silk" — say "Kanchipuram silk" or "Banarasi brocade").
 - Include price estimates when discussing options.
 - If the user says finalize/confirm/done, summarize the final outfit spec as structured JSON.
+- KEEP IT SHORT — you are speaking, not writing an essay.
 
 When finalizing, output a JSON block wrapped in ```json ... ``` with these exact keys:
 {
@@ -173,8 +185,15 @@ async def stylist_respond(
     transcript: str,
     body_profile: dict | None = None,
     session_id: str = "default",
+    detected_language: str | None = None,
 ) -> tuple[str, dict]:
     """Process user message through the stylist persona.
+
+    Args:
+        transcript: User's message text.
+        body_profile: Optional body measurements dict.
+        session_id: Conversation session ID.
+        detected_language: Auto-detected language (te/hi/en) from ASR.
 
     Returns:
         Tuple of (reply_text, outfit_state_dict).
@@ -196,8 +215,14 @@ async def stylist_respond(
     # Check for finalize intent
     wants_finalize = _detect_finalize_intent(transcript)
 
-    # Build conversation messages
-    system = STYLIST_SYSTEM_PROMPT + measurements_context
+    # Build conversation messages with language context
+    lang_instruction = ""
+    if detected_language:
+        lang_names = {"te": "Telugu", "hi": "Hindi", "en": "English"}
+        lang_name = lang_names.get(detected_language, detected_language)
+        lang_instruction = f"\n\nThe client is speaking in {lang_name}. Reply in {lang_name} (with natural code-mixing if appropriate)."
+
+    system = STYLIST_SYSTEM_PROMPT + measurements_context + lang_instruction
     if wants_finalize:
         system += (
             "\n\nThe client wants to FINALIZE. Summarize the agreed-upon outfit as a structured "

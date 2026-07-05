@@ -42,11 +42,16 @@ async def transcribe_audio(audio_bytes: bytes, language: str | None = None) -> s
     audio_bytes = _to_16k_mono_wav(audio_bytes)
     if settings.huggingface_api_key:
         try:
-            return await _hf_whisper(audio_bytes, language)
+            result = await _hf_whisper(audio_bytes, language)
+            if result:
+                logger.info("[ASR:hf_whisper] success: %s...", result[:60])
+                return result
         except httpx.HTTPError as exc:
             logger.warning("HF Whisper failed: %s", exc)
 
-    return _mock_transcribe(audio_bytes)
+    # No mock fallback — return empty string so callers know ASR truly failed
+    logger.error("[ASR] All ASR engines failed — no transcript available")
+    return ""
 
 
 async def _hf_whisper(audio_bytes: bytes, language: str | None) -> str:
@@ -71,7 +76,3 @@ async def _hf_whisper(audio_bytes: bytes, language: str | None) -> str:
         if isinstance(data, list) and data and "text" in data[0]:
             return data[0]["text"].strip()
         return str(data)
-
-
-def _mock_transcribe(_audio_bytes: bytes) -> str:
-    return "Namaste, naaku wedding ki red lehenga kavali, budget 5000 rupees."

@@ -1,13 +1,11 @@
-"""TTS — Kokoro local → HF Inference API → silent WAV placeholder.
+"""TTS — Kokoro local → HF Inference API (no silent fallback).
 
 On Render (no GPU, 512MB RAM) Kokoro may not fit, so we fall through
-to HF Inference API for real speech synthesis.
+to HF Inference API for real speech synthesis. Returns None if all fail.
 """
 
 import base64
 import logging
-import struct
-import wave
 from io import BytesIO
 
 import httpx
@@ -34,13 +32,14 @@ async def synthesize_speech(text: str, *, language: str = "te") -> str | None:
     try:
         result = await _hf_tts(text, language)
         if result:
+            logger.info("[TTS:hf_mms] success for lang=%s", language)
             return result
     except Exception as exc:
         logger.warning("HF TTS failed: %s", exc)
 
-    # Tier 3: Silent WAV placeholder
-    logger.debug("All TTS providers unavailable; returning silent WAV")
-    return _silent_wav_base64(duration_ms=min(len(text) * 40, 8000))
+    # All real TTS providers failed — return None (no silent placeholder)
+    logger.error("[TTS] All TTS engines failed for lang=%s, text_len=%d", language, len(text))
+    return None
 
 
 def _kokoro_local(text: str, language: str) -> str | None:
@@ -55,6 +54,7 @@ def _kokoro_local(text: str, language: str) -> str | None:
         if not audio_chunks:
             return None
         import numpy as np
+        import wave
 
         combined = np.concatenate(audio_chunks)
         buf = BytesIO()
@@ -104,14 +104,3 @@ async def _hf_tts(text: str, language: str) -> str | None:
 def _lang_code(language: str) -> str:
     return {"te": "te", "hi": "h", "en": "a"}.get(language, "a")
 
-
-def _silent_wav_base64(duration_ms: int = 500) -> str:
-    rate = 24000
-    nframes = int(rate * duration_ms / 1000)
-    buf = BytesIO()
-    with wave.open(buf, "wb") as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(rate)
-        wf.writeframes(struct.pack("<" + "h" * nframes, *([0] * nframes)))
-    return base64.b64encode(buf.getvalue()).decode("ascii")

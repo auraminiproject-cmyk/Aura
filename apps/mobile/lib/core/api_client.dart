@@ -164,11 +164,13 @@ class ApiClient {
     return base64Decode(b64);
   }
 
-  /// Voice conversation — send audio, get transcript + reply audio
+  /// Voice conversation — send audio, get transcript + reply audio (base64)
+  /// Response includes: transcript, reply_text, reply_audio_b64,
+  /// detected_language, asr_engine, tts_engine, outfit_state
   Future<Map<String, dynamic>> voiceConverse({
     required String audioPath,
     required String sessionId,
-    String language = 'te',
+    String language = '',  // empty = auto-detect
   }) async {
     final form = FormData.fromMap({
       'audio': await MultipartFile.fromFile(audioPath, filename: 'audio.wav'),
@@ -179,7 +181,9 @@ class ApiClient {
     return resp.data as Map<String, dynamic>;
   }
 
-  /// Text-based stylist conversation (no audio needed)
+  /// Text-based stylist conversation — also returns TTS audio (base64)
+  /// Response includes: transcript, reply_text, reply_audio_b64,
+  /// detected_language, asr_engine, tts_engine, outfit_state
   Future<Map<String, dynamic>> voiceConverseText({
     required String message,
     required String sessionId,
