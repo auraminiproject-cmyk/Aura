@@ -121,8 +121,10 @@ async def analyze_body(
     # Run analysis
     result = await reconstruct_body(front_bytes, side_bytes, height_cm=height_cm)
 
-    # Hard-reject if confidence is too low (< 80%)
-    if result.confidence < 0.80:
+    # Hard-reject only if confidence is extremely low (< 50%)
+    # Rationale: VLM-only pipeline scores ~0.70, which is perfectly usable
+    # for fashion design + tailoring. Only reject genuinely unusable inputs.
+    if result.confidence < 0.50:
         pipeline = result.measurements.get("_pipeline", "unknown")
         raise HTTPException(
             status_code=422,
@@ -132,7 +134,7 @@ async def analyze_body(
                 "pipeline": pipeline,
                 "issues": [
                     f"Measurement confidence is only {round(result.confidence * 100)}%.",
-                    "For accurate tailoring, we need at least 80% confidence.",
+                    "For accurate tailoring, we need at least 50% confidence.",
                 ],
                 "suggestion": (
                     "Please retake your photo:\n"

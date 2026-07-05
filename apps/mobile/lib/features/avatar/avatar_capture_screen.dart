@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -219,10 +221,34 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
     } catch (e) {
       setState(() => _statusText = '');
       String msg = 'Analysis failed';
-      final errStr = e.toString();
 
-      if (errStr.contains('poor_image_quality') || errStr.contains('low_measurement_confidence')) {
-        // Show detailed retake dialog
+      // Extract error detail from DioException response body
+      // DioException.toString() does NOT include the response body,
+      // so we must check e.response?.data for the actual error type
+      String errorDetail = '';
+      String serverSuggestion = '';
+      int? confidencePercent;
+
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map<String, dynamic>) {
+          // FastAPI returns {"detail": {...}} for HTTPException
+          final detail = data['detail'];
+          if (detail is Map<String, dynamic>) {
+            errorDetail = detail['error']?.toString() ?? '';
+            serverSuggestion = detail['suggestion']?.toString() ?? '';
+            confidencePercent = detail['confidence'] as int?;
+          } else if (detail is String) {
+            errorDetail = detail;
+          }
+        }
+        errorDetail = errorDetail.isEmpty ? e.toString() : errorDetail;
+      } else {
+        errorDetail = e.toString();
+      }
+
+      if (errorDetail.contains('poor_image_quality') || errorDetail.contains('low_measurement_confidence')) {
+        // Show detailed retake dialog with server suggestion if available
         if (mounted) {
           showDialog(
             context: context,
@@ -233,7 +259,12 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
                 children: [
                   Icon(Icons.photo_camera, color: Colors.orange.shade300, size: 22),
                   const SizedBox(width: 10),
-                  const Expanded(child: Text('Better Photo Needed', style: TextStyle(color: Colors.white, fontSize: 17))),
+                  Expanded(child: Text(
+                    confidencePercent != null
+                        ? 'Confidence: $confidencePercent%'
+                        : 'Better Photo Needed',
+                    style: const TextStyle(color: Colors.white, fontSize: 17),
+                  )),
                 ],
               ),
               content: Column(
@@ -264,7 +295,7 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
         return;
       }
 
-      msg = '❌ $errStr';
+      msg = '❌ $errorDetail';
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red.shade800));
       }
