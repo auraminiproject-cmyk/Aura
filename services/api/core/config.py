@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # Stylist persona model — change this one var post-finetune
     llm_stylist_model: str = "groq/llama-3.3-70b-versatile"
 
+    # Multi-agent fashion pipeline models
+    fashion_reasoning_model: str = "groq/llama-3.3-70b-versatile"
+    fashion_fast_model: str = "groq/llama-3.1-8b-instant"
+
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 60
 

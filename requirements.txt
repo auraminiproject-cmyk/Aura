@@ -34,3 +34,5 @@ aiosqlite==0.20.0
 cryptography==44.0.0
 mediapipe>=0.10.18
 opencv-python-headless>=4.9.0
+ddgs>=6.3.0
+gradio_client>=1.5.0

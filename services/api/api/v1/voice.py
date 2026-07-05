@@ -190,6 +190,9 @@ class FinalizeResponse(BaseModel):
     image_url: str | None
     wardrobe_item_id: str | None
     web_matches: list[dict]
+    tryon_image_b64: str | None = None
+    tailoring: dict | None = None
+    reasoning: str | None = None
 
 
 @router.post("/finalize", response_model=FinalizeResponse)
@@ -198,9 +201,14 @@ async def finalize_outfit(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Finalize outfit: lock spec → generate image → save to wardrobe → web match.
+    """Finalize outfit: lock spec → generate image → tailoring → web search → try-on.
 
-    Call this after the stylist conversation reaches 'finalized' stage.
+    Enhanced pipeline:
+    1. Generate outfit image (HF SDXL)
+    2. Compute tailoring measurements (deterministic)
+    3. Real product search (DuckDuckGo)
+    4. Virtual try-on (HF Spaces)
+    5. Save to wardrobe
     """
     session = get_session(body.session_id)
     if not session:
@@ -221,7 +229,23 @@ async def finalize_outfit(
 
     spec = session.spec.to_dict()
 
-    # Phase D: Generate outfit image
+    # Fetch body profile for tailoring + try-on
+    body_profile = None
+    body_analysis = None
+    try:
+        result = await db.execute(
+            select(BodyProfile)
+            .where(BodyProfile.user_id == user_id)
+            .order_by(BodyProfile.created_at.desc())
+            .limit(1)
+        )
+        profile = result.scalar_one_or_none()
+        if profile and profile.measurements:
+            body_profile = profile.measurements
+    except Exception:
+        pass
+
+    # Phase D: Generate outfit image (existing SDXL pipeline)
     image_url = None
     try:
         from services.vision.generate_outfit import generate_from_spec
@@ -232,7 +256,63 @@ async def finalize_outfit(
     except Exception as exc:
         logger.warning("Outfit image generation failed: %s", exc)
 
-    # Phase E: Auto-save to wardrobe
+    # Phase E: Compute tailoring measurements (deterministic)
+    tailoring_data = None
+    if body_profile:
+        try:
+            from services.agent.tailoring_calc import compute as compute_tailoring
+            from services.agent.body_analyzer import analyze as analyze_body
+
+            body_analysis_result = analyze_body(body_profile)
+            body_analysis = body_analysis_result.to_dict()
+
+            tailoring = compute_tailoring(
+                garment_type=spec.get("garment_type", "kurta"),
+                fabric=spec.get("fabric", "cotton"),
+                measurements=body_profile,
+                body_type=body_analysis_result.body_type,
+            )
+            tailoring_data = tailoring.to_dict()
+            logger.info("[finalize] Tailoring computed for %s, body_type=%s",
+                        spec.get("garment_type"), body_analysis_result.body_type)
+        except Exception as exc:
+            logger.warning("Tailoring calculation failed: %s", exc)
+
+    # Phase F: Real product search (DuckDuckGo — real URLs)
+    web_matches: list[dict] = []
+    try:
+        from services.retrieval.web_search import search_products as real_search
+        web_matches = await real_search(
+            spec,
+            limit=5,
+            max_price_inr=spec.get("budget_inr"),
+        )
+        logger.info("[finalize] Found %d real products via web search", len(web_matches))
+    except Exception as exc:
+        logger.warning("Real web search failed, trying legacy: %s", exc)
+        # Fallback to legacy product match
+        try:
+            from services.retrieval.web_match import match_web_garments
+            web_matches = await match_web_garments(spec, limit=5)
+        except Exception as exc2:
+            logger.warning("Legacy web match also failed: %s", exc2)
+
+    # Phase G: Virtual try-on (HF Spaces — best-effort)
+    tryon_image_b64 = None
+    try:
+        from services.vision.virtual_tryon import generate_tryon_image
+        tryon_bytes, tryon_engine = await generate_tryon_image(
+            spec=spec,
+            body_analysis=body_analysis,
+        )
+        if tryon_bytes and len(tryon_bytes) > 500:
+            tryon_image_b64 = base64.b64encode(tryon_bytes).decode("ascii")
+            logger.info("[finalize] Try-on image generated via %s (%d bytes)",
+                        tryon_engine, len(tryon_bytes))
+    except Exception as exc:
+        logger.warning("Virtual try-on failed (non-blocking): %s", exc)
+
+    # Phase H: Auto-save to wardrobe
     wardrobe_item_id = None
     try:
         item = WardrobeItem(
@@ -249,17 +329,20 @@ async def finalize_outfit(
     except Exception as exc:
         logger.warning("Wardrobe save failed: %s", exc)
 
-    # Phase F: Web garment matching (best-effort, non-blocking)
-    web_matches: list[dict] = []
-    try:
-        from services.retrieval.web_match import match_web_garments
-        web_matches = await match_web_garments(spec, limit=5)
-    except Exception as exc:
-        logger.warning("Web match failed (non-blocking): %s", exc)
+    # Extract reasoning from the last session history if available
+    reasoning = None
+    if session.history:
+        for msg in reversed(session.history):
+            if msg.get("role") == "assistant" and "<think>" in (msg.get("content") or ""):
+                reasoning = msg["content"]
+                break
 
     return FinalizeResponse(
         spec=spec,
         image_url=image_url,
         wardrobe_item_id=wardrobe_item_id,
         web_matches=web_matches,
+        tryon_image_b64=tryon_image_b64,
+        tailoring=tailoring_data,
+        reasoning=reasoning,
     )

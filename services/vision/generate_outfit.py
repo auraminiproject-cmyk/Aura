@@ -66,27 +66,24 @@ async def generate_outfits(
                     variants.append(OutfitVariant(
                         image_base64=base64.b64encode(image_bytes).decode("ascii"),
                         prompt=prompt,
-                        clip_score=0.35 + (i * 0.02),
+                        clip_score=0.0,  # Real score: computed below if FashionCLIP available
                     ))
                     continue
             except Exception as exc:
                 logger.warning("HF SDXL generation failed for variant %d: %s", i, exc)
 
-        # Fallback: deterministic placeholder
-        score = 0.30 + (i * 0.02)
-        if score < clip_threshold:
-            continue
+        # Fallback: deterministic placeholder — clearly marked as non-SDXL
         variants.append(OutfitVariant(
             image_base64=_placeholder_png_base64(f"{seed_base}-{i}"),
             prompt=prompt,
-            clip_score=score,
+            clip_score=0.0,  # Placeholder — no real similarity to compute
         ))
 
     if not variants:
         variants.append(OutfitVariant(
             image_base64=_placeholder_png_base64(seed_base),
             prompt=design_brief,
-            clip_score=0.35,
+            clip_score=0.0,  # Placeholder fallback
         ))
 
     return OutfitGenerationResult(

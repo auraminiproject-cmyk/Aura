@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_provider.dart';
 import '../../core/aura_background.dart';
@@ -102,13 +104,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final replyText = resp['reply_text'] as String? ?? '';
       _addMessage('assistant', replyText);
 
-      // Show outfit state
+      // Show outfit state and trigger finalize
       final outfitState = resp['outfit_state'] as Map<String, dynamic>?;
       if (outfitState != null) {
         final stage = outfitState['stage'] as String? ?? '';
         if (stage == 'finalized') {
           _addMessage('assistant',
-              '✅ Outfit finalized! Your design is being generated.');
+              '✅ Outfit finalized! Generating your design...');
+          await _triggerFinalize(api);
         }
       }
 
@@ -224,13 +227,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
         _addMessage('assistant', replyText);
 
-        // Show outfit state
+        // Show outfit state and trigger finalize
         final outfitState = resp['outfit_state'] as Map<String, dynamic>?;
         if (outfitState != null) {
           final stage = outfitState['stage'] as String? ?? '';
           if (stage == 'finalized') {
             _addMessage('assistant',
-                '✅ Outfit finalized! Your design is being generated.');
+                '✅ Outfit finalized! Generating your design...');
+            await _triggerFinalize(api);
           }
         }
 
@@ -345,6 +349,272 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           ),
           _buildInputBar(),
         ],
+      ),
+    );
+  }
+  // ── Finalize trigger — calls API and shows rich results ─────────
+  Future<void> _triggerFinalize(dynamic api) async {
+    try {
+      final result = await api.finalizeOutfit(sessionId: _voiceSessionId);
+
+      // Show outfit image
+      final imageUrl = result['image_url'] as String?;
+      if (imageUrl != null && imageUrl.isNotEmpty) {
+        setState(() {
+          _messages.add({'role': 'result', 'type': 'image', 'url': imageUrl});
+        });
+        _scrollToBottom();
+      }
+
+      // Show try-on image if available
+      final tryonB64 = result['tryon_image_b64'] as String?;
+      if (tryonB64 != null && tryonB64.isNotEmpty) {
+        setState(() {
+          _messages.add({'role': 'result', 'type': 'tryon', 'data': tryonB64});
+        });
+        _scrollToBottom();
+      }
+
+      // Show tailoring measurements
+      final tailoring = result['tailoring'] as Map<String, dynamic>?;
+      if (tailoring != null) {
+        setState(() {
+          _messages.add({
+            'role': 'result',
+            'type': 'tailoring',
+            'text': _formatTailoring(tailoring),
+          });
+        });
+        _scrollToBottom();
+      }
+
+      // Show product links
+      final webMatches = result['web_matches'] as List?;
+      if (webMatches != null && webMatches.isNotEmpty) {
+        setState(() {
+          _messages.add({
+            'role': 'result',
+            'type': 'products',
+            'text': _formatProducts(webMatches),
+            'links': webMatches.map((m) => (m as Map)['url']?.toString() ?? '').join('|'),
+            'names': webMatches.map((m) => (m as Map)['name']?.toString() ?? 'Product').join('|'),
+          });
+        });
+        _scrollToBottom();
+      }
+
+      // Show reasoning (expandable)
+      final reasoning = result['reasoning'] as String?;
+      if (reasoning != null && reasoning.contains('<think>')) {
+        final thinkMatch = RegExp(r'<think>(.*?)</think>', dotAll: true).firstMatch(reasoning);
+        if (thinkMatch != null) {
+          setState(() {
+            _messages.add({
+              'role': 'result',
+              'type': 'reasoning',
+              'text': thinkMatch.group(1)?.trim() ?? '',
+            });
+          });
+          _scrollToBottom();
+        }
+      }
+    } catch (e) {
+      debugPrint('Finalize failed: $e');
+      _addMessage('assistant', '⚠️ Could not generate final design. Please try again.');
+    }
+  }
+
+  String _formatTailoring(Map<String, dynamic> tailoring) {
+    final buf = StringBuffer();
+    buf.writeln('📐 Tailoring Measurements');
+    buf.writeln('');
+
+    final cut = tailoring['cut_measurements'] as Map<String, dynamic>?;
+    if (cut != null) {
+      buf.writeln('Cut Sizes:');
+      cut.forEach((k, v) => buf.writeln('  ${k.replaceAll('_', ' ')}: ${v}cm'));
+      buf.writeln('');
+    }
+
+    final fabric = tailoring['fabric_requirement'] as Map<String, dynamic>?;
+    if (fabric != null) {
+      buf.writeln('Fabric: ${fabric['total_meters']}m needed');
+      if (fabric['notes'] != null) buf.writeln('  ${fabric['notes']}');
+      buf.writeln('');
+    }
+
+    final darts = tailoring['dart_placements'] as List?;
+    if (darts != null && darts.isNotEmpty) {
+      buf.writeln('Darts:');
+      for (final d in darts) {
+        buf.writeln('  • $d');
+      }
+    }
+    return buf.toString().trim();
+  }
+
+  String _formatProducts(List products) {
+    final buf = StringBuffer();
+    buf.writeln('🛍️ Shop Similar');
+    for (var i = 0; i < products.length && i < 5; i++) {
+      final p = products[i] as Map;
+      final name = p['name'] ?? 'Product';
+      final platform = p['platform'] ?? '';
+      final price = p['price_inr'];
+      buf.write('  ${i + 1}. $name');
+      if (platform.isNotEmpty) buf.write(' ($platform)');
+      if (price != null) buf.write(' — ₹${price.toStringAsFixed(0)}');
+      buf.writeln('');
+    }
+    return buf.toString().trim();
+  }
+
+  Widget _buildResultCard(Map<String, String> m) {
+    final type = m['type'] ?? '';
+
+    if (type == 'image' || type == 'tryon') {
+      final label = type == 'tryon' ? '👗 Virtual Try-On' : '🎨 Design Preview';
+      Widget imageWidget;
+      if (type == 'tryon') {
+        final bytes = base64Decode(m['data'] ?? '');
+        imageWidget = Image.memory(Uint8List.fromList(bytes), fit: BoxFit.cover);
+      } else {
+        imageWidget = Image.network(m['url'] ?? '', fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.white30)));
+      }
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _resultLabel(label),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 300,
+                child: imageWidget,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (type == 'products') {
+      final links = (m['links'] ?? '').split('|');
+      final names = (m['names'] ?? '').split('|');
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: LinearGradient(colors: [
+              const Color(0xFF1A237E).withValues(alpha: 0.4),
+              const Color(0xFF0D47A1).withValues(alpha: 0.3),
+            ]),
+            border: Border.all(color: const Color(0xFF42A5F5).withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _resultLabel('🛍️ Shop Similar'),
+              const SizedBox(height: 8),
+              ...List.generate(
+                links.length > 5 ? 5 : links.length,
+                (i) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: GestureDetector(
+                    onTap: () async {
+                      final url = links[i].trim();
+                      if (url.isNotEmpty) {
+                        try {
+                          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                        } catch (_) {}
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        const Icon(Icons.shopping_bag_outlined, color: Color(0xFF42A5F5), size: 16),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            i < names.length ? names[i].trim() : 'Product ${i + 1}',
+                            style: const TextStyle(
+                              color: Color(0xFF90CAF9),
+                              fontSize: 13,
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const Icon(Icons.open_in_new, color: Color(0xFF42A5F5), size: 14),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (type == 'reasoning') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _ExpandableReasoningCard(reasoning: m['text'] ?? ''),
+      );
+    }
+
+    // Default: tailoring card
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(colors: [
+            const Color(0xFF1B5E20).withValues(alpha: 0.4),
+            const Color(0xFF2E7D32).withValues(alpha: 0.3),
+          ]),
+          border: Border.all(color: const Color(0xFF66BB6A).withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _resultLabel('📐 Tailoring Measurements'),
+            const SizedBox(height: 8),
+            Text(
+              m['text'] ?? '',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 13,
+                height: 1.5,
+                fontFamily: 'monospace',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _resultLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Color(0xFFD4AF37),
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
@@ -589,6 +859,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   }
 
   Widget _buildMessageBubble(Map<String, String> m) {
+    // Route result cards to rich display widgets
+    if (m['role'] == 'result') {
+      return _buildResultCard(m);
+    }
     final isUser = m['role'] == 'user';
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -793,6 +1067,81 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           ),
         );
       },
+    );
+  }
+}
+
+/// Expandable card showing the AI's chain-of-thought reasoning.
+class _ExpandableReasoningCard extends StatefulWidget {
+  const _ExpandableReasoningCard({required this.reasoning});
+  final String reasoning;
+
+  @override
+  State<_ExpandableReasoningCard> createState() => _ExpandableReasoningCardState();
+}
+
+class _ExpandableReasoningCardState extends State<_ExpandableReasoningCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(colors: [
+          const Color(0xFF4A148C).withValues(alpha: 0.4),
+          const Color(0xFF6A1B9A).withValues(alpha: 0.3),
+        ]),
+        border: Border.all(color: const Color(0xFFCE93D8).withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Icon(
+                    _expanded ? Icons.psychology : Icons.psychology_outlined,
+                    color: const Color(0xFFCE93D8),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _expanded ? 'Hide AI Reasoning' : 'See AI Reasoning',
+                    style: const TextStyle(
+                      color: Color(0xFFD4AF37),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    color: const Color(0xFFCE93D8),
+                    size: 20,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Text(
+                widget.reasoning,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.75),
+                  fontSize: 12,
+                  height: 1.6,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -187,7 +187,11 @@ async def stylist_respond(
     session_id: str = "default",
     detected_language: str | None = None,
 ) -> tuple[str, dict]:
-    """Process user message through the stylist persona.
+    """Process user message through the multi-agent fashion pipeline.
+
+    Pipeline: Body Analyzer (deterministic) → Fashion RAG → Chain-of-Thought
+    Reasoner → Spec Extraction.  Session management, history, and finalize
+    detection are unchanged from the original.
 
     Args:
         transcript: User's message text.
@@ -198,7 +202,14 @@ async def stylist_respond(
     Returns:
         Tuple of (reply_text, outfit_state_dict).
     """
-    settings = get_settings()
+    from services.agent.body_analyzer import analyze as analyze_body
+    from services.agent.fashion_rag import retrieve as rag_retrieve, format_for_llm as rag_format
+    from services.agent.fashion_reasoner import (
+        reason as fashion_reason,
+        strip_think_blocks,
+        format_body_analysis_for_llm,
+    )
+
     session = get_or_create_session(session_id)
     session.touch()
     session.turn_count += 1
@@ -207,56 +218,67 @@ async def stylist_respond(
     session.history.append({"role": "user", "content": transcript})
 
     # Inject body measurements if available
-    measurements_context = ""
     if body_profile:
         session.spec.measurements = body_profile
-        measurements_context = f"\n\nClient's body measurements: {json.dumps(body_profile)}"
 
     # Check for finalize intent
     wants_finalize = _detect_finalize_intent(transcript)
 
-    # Build conversation messages with language context
-    lang_instruction = ""
-    if detected_language:
-        lang_names = {"te": "Telugu", "hi": "Hindi", "en": "English"}
-        lang_name = lang_names.get(detected_language, detected_language)
-        lang_instruction = f"\n\nThe client is speaking in {lang_name}. Reply in {lang_name} (with natural code-mixing if appropriate)."
+    # ── AGENT 1: Deterministic Body Analysis ────────────────────────
+    body_analysis_text = ""
+    body_analysis_dict: dict = {}
+    if body_profile:
+        try:
+            analysis = analyze_body(body_profile)
+            body_analysis_dict = analysis.to_dict()
+            body_analysis_text = format_body_analysis_for_llm(body_analysis_dict)
+            logger.info(
+                "[stylist] Body analysis: type=%s, WHR=%.2f, SHR=%.2f",
+                analysis.body_type, analysis.whr, analysis.shr,
+            )
+        except Exception as exc:
+            logger.warning("[stylist] Body analyzer failed: %s", exc)
 
-    system = STYLIST_SYSTEM_PROMPT + measurements_context + lang_instruction
-    if wants_finalize:
-        system += (
-            "\n\nThe client wants to FINALIZE. Summarize the agreed-upon outfit as a structured "
-            "JSON spec. Include their measurements in your response."
-        )
-
-    messages: list[dict[str, str]] = [{"role": "system", "content": system}]
-
-    # Add conversation history (last 10 turns)
-    for msg in session.history[-10:]:
-        messages.append(msg)
-
-    # Call LLM with stylist model
-    model = settings.llm_stylist_model
+    # ── AGENT 2: Fashion Knowledge RAG ──────────────────────────────
+    knowledge_context = ""
     try:
-        reply = await complete(
-            transcript,
-            model=model,
-            messages=messages,
-            temperature=0.6,
+        # Extract hints from transcript for RAG
+        rag_knowledge = rag_retrieve(
+            body_type=body_analysis_dict.get("body_type"),
+            user_message=transcript,
         )
+        knowledge_context = rag_format(rag_knowledge)
+        if knowledge_context:
+            logger.info("[stylist] RAG injected %d knowledge blocks", len(rag_knowledge))
     except Exception as exc:
-        logger.error("Stylist LLM failed: %s", exc)
+        logger.warning("[stylist] Fashion RAG failed: %s", exc)
+
+    # ── AGENT 3: Chain-of-Thought Fashion Reasoner ──────────────────
+    try:
+        full_reply, stripped_reply = await fashion_reason(
+            user_message=transcript,
+            body_analysis_text=body_analysis_text,
+            knowledge_context=knowledge_context,
+            conversation_history=session.history[-10:],
+            detected_language=detected_language,
+            wants_finalize=wants_finalize,
+        )
+        # Use stripped version (no <think> blocks) for TTS
+        reply = stripped_reply
+        # Store full version with reasoning in history for context
+        session.history.append({"role": "assistant", "content": full_reply})
+    except Exception as exc:
+        logger.error("Fashion reasoner failed: %s", exc)
         reply = (
             "Darling, let me think about this... "
             "Could you tell me more about the occasion and your preferences?"
         )
-
-    # Store assistant reply
-    session.history.append({"role": "assistant", "content": reply})
+        session.history.append({"role": "assistant", "content": reply})
+        full_reply = reply
 
     # Update state based on conversation
     if wants_finalize:
-        new_spec = _extract_spec_from_reply(reply, session.spec)
+        new_spec = _extract_spec_from_reply(full_reply, session.spec)
         session.spec = new_spec
         if new_spec.is_complete():
             session.stage = OutfitStage.FINALIZED
@@ -267,7 +289,7 @@ async def stylist_respond(
 
     # Also try to extract partial spec from any reply
     if session.stage != OutfitStage.FINALIZED:
-        partial = _extract_spec_from_reply(reply, session.spec)
+        partial = _extract_spec_from_reply(full_reply, session.spec)
         if partial.garment_type:
             session.spec = partial
 
@@ -276,6 +298,8 @@ async def stylist_respond(
         "stage": session.stage.value,
         "turn_count": session.turn_count,
         "spec": session.spec.to_dict() if session.spec.is_complete() or session.stage == OutfitStage.FINALIZED else None,
+        "body_analysis": body_analysis_dict if body_analysis_dict else None,
+        "reasoning": full_reply if full_reply != reply else None,
     }
 
     return reply, state_dict

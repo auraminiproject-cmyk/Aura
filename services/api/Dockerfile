@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY services ./services
 COPY infra ./infra
+COPY data ./data
 
 ENV PYTHONPATH=/app
 WORKDIR /app
