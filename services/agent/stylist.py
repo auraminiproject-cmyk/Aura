@@ -97,6 +97,7 @@ def get_session(session_id: str) -> OutfitNegotiationState | None:
 FINALIZE_KEYWORDS = [
     "finalize", "finalise", "confirm", "done", "lock it", "that's it",
     "perfect", "go with this", "yes this", "book it", "order",
+    "image", "picture", "generate", "show me", "try on", "design it", "output",
     "ఫైనల్", "ఇది చాలు", "ఇదే కావాలి", "పక్కా",  # Telugu
     "फाइनल", "यही चाहिए", "पक्का", "बस यही",  # Hindi
 ]
@@ -224,6 +225,19 @@ async def stylist_respond(
     # Check for finalize intent
     wants_finalize = _detect_finalize_intent(transcript)
 
+    # ── PLANNER & VALIDATOR ───────────────────────────────────────
+    from services.agent.measurement_validator import validate_measurements
+    from services.agent.planner import plan_next_step
+
+    validation_warnings = validate_measurements(body_profile)
+    plan = plan_next_step(
+        transcript=transcript, 
+        session_stage=session.stage.value, 
+        spec_is_complete=session.spec.is_complete(),
+        has_validation_errors=bool(validation_warnings)
+    )
+    logger.info("[stylist] Planner Goal: %s, Validation Warnings: %d", plan['goal'], len(validation_warnings))
+
     # ── AGENT 1: Deterministic Body Analysis ────────────────────────
     body_analysis_text = ""
     body_analysis_dict: dict = {}
@@ -262,6 +276,8 @@ async def stylist_respond(
             conversation_history=session.history[-10:],
             detected_language=detected_language,
             wants_finalize=wants_finalize,
+            plan_goal=plan['goal'],
+            validation_warnings=validation_warnings,
         )
         # Use stripped version (no <think> blocks) for TTS
         reply = stripped_reply

@@ -64,6 +64,7 @@ Then give the actual recommendation — warm, specific, actionable.
 - If constraints conflict, explain the trade-off and your reasoning
 - KEEP SPOKEN REPLIES CONCISE (3-5 sentences after thinking) — this will be TTS'd
 - NEVER give generic advice — every word must be unique to THIS client
+- NEVER say you are an AI or a text-based model. If the client asks to see the outfit, generate an image, or try it on, agree enthusiastically and use the word "finalize" to trigger the visual generation pipeline.
 
 ═══ LANGUAGE MIRRORING ═══
 {language_instruction}
@@ -84,6 +85,8 @@ async def reason(
     conversation_history: list[dict[str, str]] | None = None,
     detected_language: str | None = None,
     wants_finalize: bool = False,
+    plan_goal: str | None = None,
+    validation_warnings: list[str] | None = None,
 ) -> tuple[str, str]:
     """Run the fashion reasoning agent.
 
@@ -94,6 +97,8 @@ async def reason(
         conversation_history: Previous messages in this session.
         detected_language: Auto-detected language (te/hi/en).
         wants_finalize: Whether the user wants to finalize the outfit.
+        plan_goal: Planner goal for current turn.
+        validation_warnings: List of measurement validation issues.
 
     Returns:
         Tuple of (full_reasoning_reply, stripped_reply_for_tts).
@@ -116,6 +121,16 @@ async def reason(
         knowledge_context=knowledge_context or "(No specific knowledge retrieved — reason from your training.)",
         body_analysis=body_analysis_text or "(No body measurements available yet — ask the client to upload photos for avatar analysis.)",
     )
+
+    if validation_warnings:
+        system += "\n\n═══ VALIDATION WARNINGS (MUST ADDRESS) ═══\n"
+        system += "The user's body measurements have the following unrealistic values:\n"
+        for warning in validation_warnings:
+            system += f"- {warning}\n"
+        system += "You MUST gently ask the user to correct these measurements before proposing an outfit.\n"
+
+    if plan_goal:
+        system += f"\n\n═══ CURRENT CONVERSATION GOAL ═══\nYour primary objective for this turn is: {plan_goal}\n"
 
     if wants_finalize:
         system += (
