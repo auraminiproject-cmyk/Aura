@@ -8,7 +8,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _PING_INTERVAL = 600  # 10 minutes
-_SELF_URL = "https://aura1-3rk2.onrender.com/health"
+_SELF_URL = "https://aura-0cet.onrender.com/health"
 
 
 async def keep_alive_loop() -> None:

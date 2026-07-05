@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 
+import 'package:dio/dio.dart';
+
 import '../../core/api_provider.dart';
 import '../../core/aura_background.dart';
 
@@ -24,9 +26,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     with TickerProviderStateMixin {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
-  final _messages = <Map<String, String>>[];
+  final _messages = <Map<String, dynamic>>[];
   final _voiceSessionId = 'voice-default';
   bool _loading = false;
+  String _detectedLang = 'en'; // Auto-updated from responses
   final _audioPlayer = AudioPlayer();
   late final AnimationController _typingCtrl;
   late final AnimationController _pulseCtrl;
@@ -98,8 +101,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final resp = await api.voiceConverseText(
         message: text,
         sessionId: _voiceSessionId,
-        language: 'te',
+        language: _detectedLang,
       );
+
+      // Update detected language from server response
+      final serverLang = resp['detected_language'] as String?;
+      if (serverLang != null && serverLang.isNotEmpty) {
+        _detectedLang = serverLang;
+      }
 
       final replyText = resp['reply_text'] as String? ?? '';
       _addMessage('assistant', replyText);
@@ -117,6 +126,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
       // Play reply audio if available (now base64 inline)
       await _playAudioFromResponse(resp);
+    } on DioException catch (e) {
+      String msg = 'Could not reach the server';
+      final data = e.response?.data;
+      if (data is Map && data['detail'] != null) {
+        msg = data['detail'].toString();
+      } else if (e.message != null) {
+        msg = e.message!;
+      }
+      _addMessage('assistant', '❌ $msg');
     } catch (e) {
       _addMessage('assistant',
           '❌ Could not reach the server.\nPlease check your connection.');
@@ -125,9 +143,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
-  void _addMessage(String role, String text) {
+  void _addMessage(String role, String text, {String? imageB64, List<Map<String, dynamic>>? products, Map<String, dynamic>? tailoring, Map<String, dynamic>? spec}) {
     setState(() {
-      _messages.add({'role': role, 'text': text});
+      _messages.add({
+        'role': role,
+        'text': text,
+        if (imageB64 != null) 'image_b64': imageB64,
+        if (products != null) 'products': products,
+        if (tailoring != null) 'tailoring': tailoring,
+        if (spec != null) 'spec': spec,
+      });
     });
     _scrollToBottom();
   }
@@ -240,6 +265,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
 
         // Auto-play reply audio
         await _playAudioFromResponse(resp);
+      } on DioException catch (e) {
+        String msg = 'Could not reach the server';
+        final data = e.response?.data;
+        if (data is Map && data['detail'] != null) {
+          msg = data['detail'].toString();
+        } else if (e.message != null) {
+          msg = e.message!;
+        }
+        _addMessage('assistant', '❌ $msg');
       } catch (e) {
         _addMessage('assistant',
             '❌ Could not reach the server.\nPlease check your connection.');
@@ -362,7 +396,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final imageUrl = result['image_url'] as String?;
       if (outfitB64 != null && outfitB64.isNotEmpty) {
         setState(() {
-          _messages.add({'role': 'result', 'type': 'tryon', 'data': outfitB64});
+          _messages.add(<String, String>{'role': 'result', 'type': 'image_b64', 'data': outfitB64});
         });
         _scrollToBottom();
       } else if (imageUrl != null && imageUrl.isNotEmpty) {
@@ -424,6 +458,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           _scrollToBottom();
         }
       }
+    } on DioException catch (e) {
+      debugPrint('Finalize failed: $e');
+      String msg = 'Could not generate final design';
+      final data = e.response?.data;
+      if (data is Map && data['detail'] != null) {
+        msg = data['detail'].toString();
+      }
+      _addMessage('assistant', '⚠️ $msg. Please try again.');
     } catch (e) {
       debugPrint('Finalize failed: $e');
       _addMessage('assistant', '⚠️ Could not generate final design. Please try again.');
@@ -478,10 +520,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget _buildResultCard(Map<String, String> m) {
     final type = m['type'] ?? '';
 
-    if (type == 'image' || type == 'tryon') {
+    if (type == 'image' || type == 'tryon' || type == 'image_b64') {
       final label = type == 'tryon' ? '👗 Virtual Try-On' : '🎨 Design Preview';
       Widget imageWidget;
-      if (type == 'tryon') {
+      if (type == 'tryon' || type == 'image_b64') {
         final bytes = base64Decode(m['data'] ?? '');
         imageWidget = Image.memory(Uint8List.fromList(bytes), fit: BoxFit.cover);
       } else {
