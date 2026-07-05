@@ -70,17 +70,33 @@ final initApiProvider = FutureProvider<bool>((ref) async {
   return false;
 });
 
-/// Perform guest login, cache tokens, and update state.
-Future<bool> performGuestLogin(
+/// Perform auth (login/signup), cache tokens, and update state.
+Future<bool> performAuth(
   ApiClient client,
   SharedPreferences prefs,
   StateController<AppConnectionState> connState,
   StateController<bool> authState,
   StateController<String?> userIdState, {
+  required bool isSignup,
+  required String email,
+  required String password,
   String? displayName,
 }) async {
   try {
-    final data = await client.guestLogin(displayName: displayName);
+    Map<String, dynamic> data;
+    if (isSignup) {
+      data = await client.signup(
+        email: email,
+        password: password,
+        displayName: displayName ?? email.split('@')[0],
+      );
+    } else {
+      data = await client.login(
+        email: email,
+        password: password,
+      );
+    }
+    
     final token = data['access_token'] as String;
     final refreshToken = data['refresh_token'] as String?;
     final userId = data['user_id'] as String;
@@ -100,3 +116,4 @@ Future<bool> performGuestLogin(
     return false;
   }
 }
+

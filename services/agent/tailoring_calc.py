@@ -266,9 +266,19 @@ def compute(
         f"7. Hem to length ({seam_allowances['hem_cm']}cm hem allowance). Final press.",
     ])
 
+    safe_measurements = {}
+    for k, v in measurements.items():
+        if isinstance(v, (int, float)):
+            safe_measurements[k] = float(v)
+        elif isinstance(v, str):
+            try:
+                safe_measurements[k] = float(v)
+            except ValueError:
+                pass
+
     return TailoringSpec(
         garment_type=garment_type,
-        body_measurements={k: float(v) for k, v in measurements.items()},
+        body_measurements=safe_measurements,
         cut_measurements=cut_measurements,
         ease_allowances=ease_allowances,
         fabric_requirement=fabric_req,

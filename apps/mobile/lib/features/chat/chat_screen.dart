@@ -401,7 +401,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         _scrollToBottom();
       } else if (imageUrl != null && imageUrl.isNotEmpty) {
         setState(() {
-          _messages.add({'role': 'result', 'type': 'image', 'url': imageUrl});
+          _messages.add(<String, String>{'role': 'result', 'type': 'image', 'url': imageUrl});
         });
         _scrollToBottom();
       }
@@ -410,7 +410,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final tryonB64 = result['tryon_image_b64'] as String?;
       if (tryonB64 != null && tryonB64.isNotEmpty) {
         setState(() {
-          _messages.add({'role': 'result', 'type': 'tryon', 'data': tryonB64});
+          _messages.add(<String, String>{'role': 'result', 'type': 'tryon', 'data': tryonB64});
         });
         _scrollToBottom();
       }
@@ -419,7 +419,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final tailoring = result['tailoring'] as Map<String, dynamic>?;
       if (tailoring != null) {
         setState(() {
-          _messages.add({
+          _messages.add(<String, String>{
             'role': 'result',
             'type': 'tailoring',
             'text': _formatTailoring(tailoring),
@@ -517,17 +517,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return buf.toString().trim();
   }
 
-  Widget _buildResultCard(Map<String, String> m) {
-    final type = m['type'] ?? '';
+  Widget _buildResultCard(Map<String, dynamic> m) {
+    final type = m['type']?.toString() ?? '';
 
     if (type == 'image' || type == 'tryon' || type == 'image_b64') {
       final label = type == 'tryon' ? '👗 Virtual Try-On' : '🎨 Design Preview';
       Widget imageWidget;
       if (type == 'tryon' || type == 'image_b64') {
-        final bytes = base64Decode(m['data'] ?? '');
+        final bytes = base64Decode(m['data']?.toString() ?? '');
         imageWidget = Image.memory(Uint8List.fromList(bytes), fit: BoxFit.cover);
       } else {
-        imageWidget = Image.network(m['url'] ?? '', fit: BoxFit.cover,
+        imageWidget = Image.network(m['url']?.toString() ?? '', fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.white30)));
       }
       return Padding(
@@ -550,8 +550,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
 
     if (type == 'products') {
-      final links = (m['links'] ?? '').split('|');
-      final names = (m['names'] ?? '').split('|');
+      final links = (m['links']?.toString() ?? '').split('|');
+      final names = (m['names']?.toString() ?? '').split('|');
       return Padding(
         padding: const EdgeInsets.only(bottom: 12),
         child: Container(
@@ -906,7 +906,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     );
   }
 
-  Widget _buildMessageBubble(Map<String, String> m) {
+  Widget _buildMessageBubble(Map<String, dynamic> m) {
     // Route result cards to rich display widgets
     if (m['role'] == 'result') {
       return _buildResultCard(m);
@@ -947,10 +947,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.75,
               ),
-              decoration:
-                  isUser ? AuraTheme.userBubble : AuraTheme.assistantBubble,
+              decoration: (isUser ? AuraTheme.userBubble : AuraTheme.assistantBubble).copyWith(
+                  borderRadius: BorderRadius.circular(20).copyWith(
+                  bottomRight: isUser ? Radius.zero : const Radius.circular(20),
+                  bottomLeft: !isUser ? Radius.zero : const Radius.circular(20),
+                ),
+              ),
               child: Text(
-                m['text'] ?? '',
+                m['text']?.toString() ?? '',
                 style: TextStyle(
                   color: isUser ? Colors.white : Colors.white.withValues(alpha: 0.9),
                   fontSize: 14.5,

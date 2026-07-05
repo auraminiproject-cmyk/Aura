@@ -12,9 +12,30 @@ from services.api.core.security import create_access_token, create_refresh_token
 router = APIRouter()
 
 
-class GuestLoginRequest(BaseModel):
+import bcrypt
+
+def get_password_hash(password: str) -> str:
+    pwd_bytes = password.encode('utf-8')
+    salt = bcrypt.gensalt()
+    hashed_bytes = bcrypt.hashpw(pwd_bytes, salt)
+    return hashed_bytes.decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    pwd_bytes = plain_password.encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(pwd_bytes, hashed_bytes)
+
+class SignupRequest(BaseModel):
+    email: str = Field(max_length=255)
+    password: str = Field(min_length=6)
     display_name: str | None = Field(default=None, max_length=128)
 
+class LoginRequest(BaseModel):
+    email: str = Field(max_length=255)
+    password: str = Field(min_length=6)
+
+class GuestLoginRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=128)
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -22,6 +43,37 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user_id: str
 
+@router.post("/signup", response_model=TokenResponse)
+async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(body.password)
+    user = User(
+        id=str(uuid.uuid4()), 
+        email=body.email, 
+        hashed_password=hashed_password,
+        display_name=body.display_name or body.email.split("@")[0]
+    )
+    db.add(user)
+    await db.commit()
+    
+    token = create_access_token(user.id)
+    refresh = create_refresh_token(user.id)
+    return TokenResponse(access_token=token, refresh_token=refresh, user_id=user.id)
+
+@router.post("/login", response_model=TokenResponse)
+async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(User).where(User.email == body.email))
+    user = result.scalar_one_or_none()
+    
+    if not user or not user.hashed_password or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    token = create_access_token(user.id)
+    refresh = create_refresh_token(user.id)
+    return TokenResponse(access_token=token, refresh_token=refresh, user_id=user.id)
 
 @router.post("/guest", response_model=TokenResponse)
 async def guest_login(body: GuestLoginRequest, db: AsyncSession = Depends(get_db)):
@@ -31,6 +83,7 @@ async def guest_login(body: GuestLoginRequest, db: AsyncSession = Depends(get_db
     token = create_access_token(user.id)
     refresh = create_refresh_token(user.id)
     return TokenResponse(access_token=token, refresh_token=refresh, user_id=user.id)
+
 
 
 class RefreshRequest(BaseModel):

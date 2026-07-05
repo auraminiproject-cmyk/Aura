@@ -36,3 +36,4 @@ mediapipe>=0.10.18
 opencv-python-headless>=4.9.0
 ddgs>=6.3.0
 gradio_client>=1.5.0
+duckduckgo-search>=6.0.0

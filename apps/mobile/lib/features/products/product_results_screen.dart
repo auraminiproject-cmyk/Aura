@@ -16,7 +16,6 @@ class _ProductResultsScreenState extends ConsumerState<ProductResultsScreen> {
   final _queryController = TextEditingController();
   List<dynamic> _products = [];
   bool _loading = false;
-  String _engine = '';
 
   Future<void> _search() async {
     final query = _queryController.text.trim();

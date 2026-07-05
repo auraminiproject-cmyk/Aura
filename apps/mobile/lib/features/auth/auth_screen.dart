@@ -15,7 +15,10 @@ class AuthScreen extends ConsumerStatefulWidget {
 
 class _AuthScreenState extends ConsumerState<AuthScreen>
     with SingleTickerProviderStateMixin {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  bool _isSignup = false;
   bool _loading = false;
   String? _error;
   late AnimationController _fadeCtrl;
@@ -34,12 +37,25 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   @override
   void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
     _nameController.dispose();
     _fadeCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _submit() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Email and password are required.');
+      return;
+    }
+    if (password.length < 6) {
+      setState(() => _error = 'Password must be at least 6 characters.');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -53,12 +69,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
     final name = _nameController.text.trim();
 
-    final success = await performGuestLogin(
+    final success = await performAuth(
       client,
       prefs,
       connState,
       authState,
       userIdState,
+      isSignup: _isSignup,
+      email: email,
+      password: password,
       displayName: name.isNotEmpty ? name : null,
     );
 
@@ -67,7 +86,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     } else {
       setState(() {
         _loading = false;
-        _error = 'Could not connect to server. Please check your internet.';
+        _error = 'Authentication failed. Please check credentials or internet.';
       });
     }
   }
@@ -136,7 +155,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   ),
                 ),
                 const SizedBox(height: 48),
-                // Name field
+                // Email field
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
@@ -146,16 +165,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     color: Colors.white.withValues(alpha: 0.05),
                   ),
                   child: TextField(
-                    controller: _nameController,
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(color: Colors.white, fontSize: 16),
                     decoration: InputDecoration(
-                      hintText: 'Your name (optional)',
+                      hintText: 'Email address',
                       hintStyle: TextStyle(
                         color: Colors.white.withValues(alpha: 0.3),
                         fontSize: 16,
                       ),
                       prefixIcon: Icon(
-                        Icons.person_outline,
+                        Icons.email_outlined,
                         color: Colors.white.withValues(alpha: 0.4),
                       ),
                       border: InputBorder.none,
@@ -164,10 +184,78 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         vertical: 16,
                       ),
                     ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _login(),
+                    textInputAction: TextInputAction.next,
                   ),
                 ),
+                const SizedBox(height: 12),
+                // Password field
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                    ),
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                  child: TextField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    decoration: InputDecoration(
+                      hintText: 'Password',
+                      hintStyle: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        fontSize: 16,
+                      ),
+                      prefixIcon: Icon(
+                        Icons.lock_outline,
+                        color: Colors.white.withValues(alpha: 0.4),
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                    ),
+                    textInputAction: _isSignup ? TextInputAction.next : TextInputAction.done,
+                    onSubmitted: _isSignup ? null : (_) => _submit(),
+                  ),
+                ),
+                if (_isSignup) ...[
+                  const SizedBox(height: 12),
+                  // Name field
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                      ),
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                    child: TextField(
+                      controller: _nameController,
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      decoration: InputDecoration(
+                        hintText: 'Your name (optional)',
+                        hintStyle: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 16,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.person_outline,
+                          color: Colors.white.withValues(alpha: 0.4),
+                        ),
+                        border: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _submit(),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 20),
                 // Error message
                 if (_error != null)
@@ -187,7 +275,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _loading ? null : _login,
+                    onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFD4AF37),
                       foregroundColor: Colors.black,
@@ -205,9 +293,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                               color: Colors.black,
                             ),
                           )
-                        : const Text(
-                            'Get Started',
-                            style: TextStyle(
+                        : Text(
+                            _isSignup ? 'Sign Up' : 'Log In',
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 1,
@@ -216,12 +304,21 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Voice-powered • Multilingual • Personalized',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.3),
-                    fontSize: 12,
-                    letterSpacing: 1,
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _isSignup = !_isSignup;
+                      _error = null;
+                    });
+                  },
+                  child: Text(
+                    _isSignup
+                        ? 'Already have an account? Log In'
+                        : "Don't have an account? Sign Up",
+                    style: TextStyle(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.8),
+                      fontSize: 14,
+                    ),
                   ),
                 ),
                 const Spacer(flex: 3),

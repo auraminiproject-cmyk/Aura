@@ -58,7 +58,7 @@
 | **Image Generation** | WORKING | Returns real Base64 image bytes/URLs. |
 | **Product Retrieval** | WORKING | Uses DuckDuckGo real search for `ajio`, `myntra`, etc. |
 | **Wardrobe Save** | WORKING | Saves successfully via SQLAlchemy SQLite. |
-| **Render Deployment** | TO BE VERIFIED | Ready for push and deployment verification on Render. |
+| **Render Deployment** | WORKING | Verified `/health` and OpenAPI on `aura-0cet.onrender.com` |
 
 ---
 

@@ -27,13 +27,11 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
 
   // Analysis state
   bool _analyzing = false;
-  bool _checkingQuality = false;
   String _statusText = '';
   Map<String, dynamic>? _result;
 
   // Stored measurements
   Map<String, dynamic>? _storedMeasurements;
-  bool _loadingStored = true;
 
   @override
   void initState() {
@@ -50,8 +48,6 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
       }
     } catch (_) {
       // No stored measurements
-    } finally {
-      setState(() => _loadingStored = false);
     }
   }
 
@@ -118,7 +114,6 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
     final connState = ref.read(connectionStateProvider);
     if (connState != AppConnectionState.online) return;
 
-    setState(() => _checkingQuality = true);
     try {
       final api = ref.read(apiClientProvider);
       final quality = await api.checkImageQuality(path);
@@ -145,8 +140,6 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
       }
     } catch (_) {
       // Quality check failed silently — don't block the user
-    } finally {
-      setState(() => _checkingQuality = false);
     }
   }
 
@@ -175,7 +168,9 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
 
     final heightCm = double.tryParse(_heightController.text) ?? 165.0;
     if (heightCm < 100 || heightCm > 250) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Height must be 100–250 cm')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('⚠️ Height must be 100–250 cm')));
+      }
       return;
     }
 
@@ -226,7 +221,6 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
       // DioException.toString() does NOT include the response body,
       // so we must check e.response?.data for the actual error type
       String errorDetail = '';
-      String serverSuggestion = '';
       int? confidencePercent;
 
       if (e is DioException && e.response?.data != null) {
@@ -236,7 +230,6 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
           final detail = data['detail'];
           if (detail is Map<String, dynamic>) {
             errorDetail = detail['error']?.toString() ?? '';
-            serverSuggestion = detail['suggestion']?.toString() ?? '';
             confidencePercent = detail['confidence'] as int?;
           } else if (detail is String) {
             errorDetail = detail;
@@ -531,10 +524,10 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
           borderRadius: BorderRadius.circular(16),
           child: Center(
             child: _analyzing
-                ? Row(mainAxisSize: MainAxisSize.min, children: [
-                    const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
-                    const SizedBox(width: 10),
-                    const Text('Analyzing with AI Vision...', style: TextStyle(color: Colors.white, fontSize: 15)),
+                ? const Row(mainAxisSize: MainAxisSize.min, children: [
+                    SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+                    SizedBox(width: 10),
+                    Text('Analyzing with AI Vision...', style: TextStyle(color: Colors.white, fontSize: 15)),
                   ])
                 : Row(mainAxisSize: MainAxisSize.min, children: [
                     const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
@@ -788,10 +781,10 @@ class _PhotoCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        color: this.required ? const Color(0xFF8B1538).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
+                        color: required ? const Color(0xFF8B1538).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
                       ),
                       child: Text(sublabel, style: TextStyle(
-                        color: this.required ? Colors.red.shade200 : Colors.white.withValues(alpha: 0.4),
+                        color: required ? Colors.red.shade200 : Colors.white.withValues(alpha: 0.4),
                         fontSize: 10, fontWeight: FontWeight.w500,
                       )),
                     ),

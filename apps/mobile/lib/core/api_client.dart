@@ -36,6 +36,29 @@ class ApiClient {
     return data;
   }
 
+  Future<Map<String, dynamic>> login({required String email, required String password}) async {
+    final resp = await _dio.post('/api/v1/auth/login', data: {
+      'email': email,
+      'password': password,
+    });
+    final data = resp.data as Map<String, dynamic>;
+    setToken(data['access_token'] as String);
+    userId = data['user_id'] as String?;
+    return data;
+  }
+
+  Future<Map<String, dynamic>> signup({required String email, required String password, required String displayName}) async {
+    final resp = await _dio.post('/api/v1/auth/signup', data: {
+      'email': email,
+      'password': password,
+      'display_name': displayName,
+    });
+    final data = resp.data as Map<String, dynamic>;
+    setToken(data['access_token'] as String);
+    userId = data['user_id'] as String?;
+    return data;
+  }
+
   Future<Map<String, dynamic>> sendChat({
     required String message,
     String? sessionId,

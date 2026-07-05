@@ -271,7 +271,10 @@ async def finalize_outfit(
         _settings = _gs()
         _img_bytes = None
         if _settings.huggingface_api_key and hf_breaker.current_state != 'open':
-            _img_bytes = await _hf_sdxl_generate(_prompt, _settings)
+            try:
+                _img_bytes = await _hf_sdxl_generate(_prompt, _settings)
+            except Exception as e:
+                logger.warning('HF SDXL direct generation failed: %s', e)
         if not _img_bytes or len(_img_bytes) < 500:
             _seed = _hashlib.sha256(_prompt.encode()).hexdigest()
             _img_bytes = base64.b64decode(_placeholder_png_base64(_seed))
