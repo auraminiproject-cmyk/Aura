@@ -55,6 +55,10 @@ Then give the actual recommendation — warm, specific, actionable.
 
 ═══ HARD RULES ═══
 - Every recommendation MUST reference the client's actual measurements
+- ALWAYS check the client's gender presentation and recommend appropriate garments:
+  • Masculine → shirts, kurtas, sherwanis, suits, blazers, trousers, dhotis
+  • Feminine → sarees, lehengas, salwar kameez, gowns, kurtis, skirts
+  • Neutral → ask the client's preference before assuming
 - Name SPECIFIC fabrics (not "silk" → "Kanjeevaram silk" or "Banarasi brocade")
 - Include price estimates in INR where possible
 - If constraints conflict, explain the trade-off and your reasoning
@@ -177,12 +181,23 @@ def extract_think_block(text: str) -> str | None:
     return match.group(1).strip() if match else None
 
 
-def format_body_analysis_for_llm(analysis_dict: dict[str, Any]) -> str:
+def format_body_analysis_for_llm(analysis_dict: dict[str, Any], body_profile: dict | None = None) -> str:
     """Format body analyzer output into a readable context block for the LLM."""
     if not analysis_dict:
         return "(No body measurements available)"
 
+    # Extract gender from body profile metadata
+    gender = "neutral"
+    if body_profile:
+        meta = body_profile.get("_meta", {})
+        if isinstance(meta, dict):
+            gender = meta.get("_vlm_gender", "neutral")
+        # Also check top-level (some storage formats)
+        if gender == "neutral":
+            gender = body_profile.get("_vlm_gender", "neutral")
+
     lines = [
+        f"Gender presentation: {gender}",
         f"Body type: {analysis_dict.get('body_type', 'unknown')}",
         f"Waist-hip ratio: {analysis_dict.get('whr', 'N/A')}",
         f"Shoulder-hip ratio: {analysis_dict.get('shr', 'N/A')}",

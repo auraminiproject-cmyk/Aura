@@ -60,15 +60,25 @@ async def complete(
 
         # Tier 2 — Groq Direct (production primary)
         if settings.groq_api_key and chosen.startswith("groq/"):
+            groq_model = chosen.replace("groq/", "")
             try:
-                groq_model = chosen.replace("groq/", "")
-                logger.info("Calling Groq with model=%s, key=%s...", groq_model, settings.groq_api_key[:10])
+                logger.info("Calling Groq with model=%s", groq_model)
                 result = await _groq_complete(messages, model=groq_model, temperature=temperature)
                 trace.set_output(result[:500])
                 logger.info("LLM response via Groq direct (%s)", groq_model)
                 return result
             except Exception as exc:
-                logger.error("Groq direct failed: %s", exc, exc_info=True)
+                logger.warning("Groq %s failed: %s", groq_model, exc)
+                # On 429 rate limit, try smaller model before giving up
+                if "429" in str(exc) and groq_model != "llama-3.1-8b-instant":
+                    try:
+                        logger.info("Groq 429 — falling back to llama-3.1-8b-instant")
+                        result = await _groq_complete(messages, model="llama-3.1-8b-instant", temperature=temperature)
+                        trace.set_output(result[:500])
+                        logger.info("LLM response via Groq fallback (8b-instant)")
+                        return result
+                    except Exception as exc2:
+                        logger.warning("Groq 8b-instant also failed: %s", exc2)
         else:
             logger.warning("Groq skipped: key_set=%s, model=%s", bool(settings.groq_api_key), chosen)
 
@@ -139,17 +149,69 @@ async def _ollama_complete(prompt: str, *, system: str | None, temperature: floa
 
 
 def _offline_fallback(prompt: str) -> str:
-    """Graceful degradation when no LLM providers are reachable."""
+    """Graceful degradation when no LLM providers are reachable.
+
+    Gender-neutral, contextually varied, non-repetitive.
+    """
+    import random
     lower = prompt.lower()
-    if any(w in lower for w in ("wedding", "పెళ్ళి", "vivah", "शादी")):
-        return (
-            "Meeku wedding ki perfect ethnic look suggest chestanu! "
-            "Red/gold lehenga or silk saree body type ki flattering ga untundi. "
-            "Budget 5000 INR kinda best options chupistha — photo upload cheyandi avatar kosam."
-        )
-    if any(w in lower for w in ("hello", "hi", "namaste", "నమస్కారం")):
-        return "Namaste! Nenu mee personal fashion stylist. Emi occasion ki dress kavali cheppandi."
-    return (
-        "Meeru cheppina style brief batti outfit design chestanu. "
-        "Occasion, budget, and preferred colors cheppandi — Telugu, Hindi, or English lo."
-    )
+
+    # Detect gender hints
+    is_male = any(w in lower for w in (
+        "shirt", "kurta", "sherwani", "suit", "blazer", "men", "man", "male",
+        "boys", "guy", "groom", "dulha", "పురుషుల", "ladka",
+    ))
+    is_female = any(w in lower for w in (
+        "saree", "lehenga", "dress", "gown", "women", "woman", "female",
+        "girls", "bride", "dulhan", "స్త్రీల", "ladki", "anarkali",
+    ))
+
+    # Wedding/occasion detection
+    if any(w in lower for w in ("wedding", "పెళ్ళి", "vivah", "शादी", "marriage", "reception")):
+        if is_male or not is_female:
+            options = [
+                "Wedding look ki — classic sherwani in rich jewel tones suggest chestanu! "
+                "Navy blue or maroon silk sherwani with golden embroidery, churidar, and mojari — "
+                "regal and masculine.",
+                "Groom/wedding guest look: Silk kurta-pajama set or bandhgala suit "
+                "in deep colors. Premium fabric options ₹5000-15000 range lo available.",
+            ]
+        else:
+            options = [
+                "Wedding ki gorgeous options: Kanjeevaram silk saree or designer lehenga — "
+                "color and fabric body type ki match chestanu!",
+                "Bridal/wedding guest look: Rich silk in traditional colors — "
+                "red, maroon, or emerald green with zari work.",
+            ]
+        return random.choice(options)
+
+    # Casual/general detection
+    if any(w in lower for w in ("casual", "daily", "office", "work", "college")):
+        if is_male or not is_female:
+            return ("Smart casual look: well-fitted chinos with a crisp cotton shirt, "
+                    "or a kurta with jeans for a fusion vibe. Clean silhouette matters!")
+        return ("Everyday chic: A-line kurti with palazzo pants, or a midi dress — "
+                "comfortable yet stylish. Cotton or rayon works great.")
+
+    # Greeting
+    if any(w in lower for w in ("hello", "hi", "namaste", "నమస్కారం", "hey", "hola")):
+        greetings = [
+            "Hello! I'm AURA, your fashion stylist. Tell me — what occasion are you dressing for?",
+            "Namaste! What kind of outfit are you looking for? Wedding, party, casual, or office?",
+            "Hey! Ready to design something amazing. What's the occasion?",
+        ]
+        return random.choice(greetings)
+
+    # Finalize/confirm
+    if any(w in lower for w in ("finalize", "confirm", "done", "perfect", "yes")):
+        return ("Great choice! Let me finalize your outfit specification. "
+                "I'll generate the design with your exact measurements.")
+
+    # Generic — but VARIED, not the same question every time
+    generic = [
+        "I'd love to help with that! Tell me the occasion and I'll suggest specific fabrics and styles.",
+        "Great taste! Let me recommend something that suits your body type perfectly. What's your budget range?",
+        "Interesting! I'm thinking about colors and fabrics that would work beautifully. Formal or casual vibe?",
+        "Let me design something unique for you. Indoor or outdoor event?",
+    ]
+    return random.choice(generic)

@@ -31,17 +31,18 @@ SARVAM_LANG_MAP = {
     "english": "en-IN",
 }
 
-# TTS speaker voices available in Bulbul v3
+# TTS speaker voices available in Sarvam Bulbul
+# Valid speakers: anushka, abhilash, manisha, vidya, arya, karun, hitesh, aditya, ritu, priya, neha, rahul, pooja, rohan, simran, kavya
 SARVAM_SPEAKERS = {
-    "te": "meera",   # Telugu female
-    "hi": "meera",   # Hindi female
-    "en": "meera",   # English female
-    "te-IN": "meera",
-    "hi-IN": "meera",
-    "en-IN": "meera",
-    "telugu": "meera",
-    "hindi": "meera",
-    "english": "meera",
+    "te": "anushka",
+    "hi": "anushka",
+    "en": "anushka",
+    "te-IN": "anushka",
+    "hi-IN": "anushka",
+    "en-IN": "anushka",
+    "telugu": "anushka",
+    "hindi": "anushka",
+    "english": "anushka",
 }
 
 # Map Whisper's detected language to our short codes
@@ -132,7 +133,7 @@ async def sarvam_tts(text: str, language: str = "te") -> bytes | None:
         return None
 
     lang_code = SARVAM_LANG_MAP.get(language, "hi-IN")
-    speaker = SARVAM_SPEAKERS.get(language, "meera")
+    speaker = SARVAM_SPEAKERS.get(language, "anushka")
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:

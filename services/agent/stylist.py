@@ -231,7 +231,7 @@ async def stylist_respond(
         try:
             analysis = analyze_body(body_profile)
             body_analysis_dict = analysis.to_dict()
-            body_analysis_text = format_body_analysis_for_llm(body_analysis_dict)
+            body_analysis_text = format_body_analysis_for_llm(body_analysis_dict, body_profile)
             logger.info(
                 "[stylist] Body analysis: type=%s, WHR=%.2f, SHR=%.2f",
                 analysis.body_type, analysis.whr, analysis.shr,
