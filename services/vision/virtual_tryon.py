@@ -22,9 +22,13 @@ from services.api.core.resilience import hf_breaker
 logger = logging.getLogger(__name__)
 
 # HF Spaces that host free virtual try-on models
+# We include several low-traffic clones of IDM-VTON to bypass the massive queues on the main spaces
 _TRYON_SPACES = [
-    "Kwai-Kolors/Kolors-Virtual-Try-On",
+    "AlexLee01/yisol-IDM-VTON",
+    "cocktailpeanut/IDM-VTON",
+    "allAI-tools/IDM-VTON",
     "yisol/IDM-VTON",
+    "Kwai-Kolors/Kolors-Virtual-Try-On",
 ]
 
 
