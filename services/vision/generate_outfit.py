@@ -127,8 +127,10 @@ async def _hf_sdxl_generate(prompt: str, settings) -> bytes | None:
 async def _pollinations_generate(prompt: str) -> bytes | None:
     """Generate image using pollinations.ai (Free, no key required)."""
     import urllib.parse
+    import random
     encoded_prompt = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&nologo=true"
+    seed = random.randint(1, 1000000)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=1024&nologo=true&seed={seed}"
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.get(url, headers={"User-Agent": "Aura-Fashion-AI/1.0"})

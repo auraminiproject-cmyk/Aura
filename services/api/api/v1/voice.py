@@ -508,6 +508,12 @@ async def finalize_outfit(
                 reasoning = msg['content']
                 break
 
+    # Reset the session so we don't get trapped in a generation loop!
+    from services.agent.stylist import OutfitStage, OutfitSpec
+    session.stage = OutfitStage.PROPOSING
+    session.spec = OutfitSpec(measurements=session.spec.measurements) # preserve body profile
+    session.turn_count = 0
+
     return FinalizeResponse(
         spec=spec,
         image_url=image_url,

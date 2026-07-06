@@ -304,15 +304,16 @@ async def stylist_respond(
     has_json_block = bool(re.search(r"```json\s*(\{.*?\})\s*```", full_reply, re.DOTALL)) or \
                      bool(re.search(r"\{[^{}]*\"garment_type\"[^{}]*\}", full_reply, re.DOTALL))
 
-    if wants_finalize or has_json_block:
+    if has_json_block or wants_finalize:
         new_spec = _extract_spec_from_reply(full_reply, session.spec)
         session.spec = new_spec
-        if new_spec.is_complete():
-            session.stage = OutfitStage.FINALIZED
-        else:
-            session.stage = OutfitStage.REFINING
-    elif session.turn_count >= 2 and session.stage == OutfitStage.PROPOSING:
+        
+    if wants_finalize and session.spec.is_complete():
+        session.stage = OutfitStage.FINALIZED
+    elif has_json_block or session.turn_count >= 2:
         session.stage = OutfitStage.REFINING
+    else:
+        session.stage = OutfitStage.PROPOSING
 
     # Also try to extract partial spec from any reply
     if session.stage != OutfitStage.FINALIZED:
