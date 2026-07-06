@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.api.core.database import get_db
-from services.api.core.models import BodyProfile, WardrobeItem
+from services.api.core.models import BodyProfile, WardrobeItem, Conversation, Session as DbSession
 from services.api.core.security import get_current_user_id
 from services.api.services.sarvam_client import (
     synthesize_with_fallback,
@@ -31,6 +31,16 @@ from services.agent.stylist import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+async def _ensure_db_session(db: AsyncSession, session_id: str, user_id: str):
+    db_session = await db.get(DbSession, session_id)
+    if not db_session:
+        db.add(DbSession(id=session_id, user_id=user_id))
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
 
 
 class ConverseResponse(BaseModel):
@@ -101,6 +111,16 @@ async def voice_converse(
         detected_language=detected_lang,
     )
 
+    # Save conversation
+    await _ensure_db_session(db, session_id, user_id)
+    try:
+        db.add(Conversation(session_id=session_id, role="user", content=transcript, language=detected_lang))
+        db.add(Conversation(session_id=session_id, role="assistant", content=reply_text, language=detected_lang))
+        await db.commit()
+    except Exception as exc:
+        logger.warning("[voice/converse] Failed to save conversation: %s", exc)
+
+
     # Step 4: TTS — Sarvam Bulbul v3 (primary) → HF MMS (fallback)
     reply_audio_b64 = None
     tts_engine = "none"
@@ -159,6 +179,16 @@ async def voice_converse_text(
         session_id=body.session_id,
         detected_language=body.language,
     )
+
+    # Save conversation
+    await _ensure_db_session(db, body.session_id, user_id)
+    try:
+        db.add(Conversation(session_id=body.session_id, role="user", content=body.message, language=body.language))
+        db.add(Conversation(session_id=body.session_id, role="assistant", content=reply_text, language=body.language))
+        await db.commit()
+    except Exception as exc:
+        logger.warning("[voice/converse-text] Failed to save conversation: %s", exc)
+
 
     # Generate TTS for text conversations too (app should speak)
     reply_audio_b64 = None
@@ -367,25 +397,46 @@ async def finalize_outfit(
             tryon_image_b64 = base64.b64encode(tryon_bytes).decode('ascii')
             logger.info('[finalize] Try-on image generated via %s (%d bytes)',
                         tryon_engine, len(tryon_bytes))
-            outfit_image_b64 = None
-            image_url = None
+            # DO NOT clear outfit_image_b64 here so it can be uploaded
     except Exception as exc:
         logger.warning('Virtual try-on failed (non-blocking): %s', exc)
 
-    # Phase H: Auto-save to wardrobe (with full metadata for wardrobe display)
+    # Phase H: Upload to storage and save to wardrobe
     wardrobe_item_id = None
     try:
+        from services.api.core.storage import get_storage
+        storage = get_storage()
+        
+        wardrobe_image_url = image_url
+        if tryon_image_b64:
+            # Prefer try-on image as the wardrobe image URL
+            tryon_url = await storage.upload_bytes(base64.b64decode(tryon_image_b64), content_type="image/jpeg")
+            wardrobe_image_url = tryon_url
+            
+            # Update body profile with new try-on image
+            if profile:
+                # Need to update JSON column properly
+                current_measurements = dict(profile.measurements) if profile.measurements else {}
+                current_measurements['_front_photo_b64'] = tryon_image_b64
+                # Use flag_modified if SQLAlchemy requires it, or just re-assign
+                profile.measurements = current_measurements
+                db.add(profile)
+        
+        elif outfit_image_b64:
+            # Fallback to outfit image
+            outfit_url = await storage.upload_bytes(base64.b64decode(outfit_image_b64), content_type="image/png")
+            wardrobe_image_url = outfit_url
+
         wardrobe_meta = {
             **spec,
             '_tailoring': tailoring_data,
-            '_outfit_image_b64': outfit_image_b64[:200] if outfit_image_b64 else None,  # Truncated ref
             '_has_tryon': tryon_image_b64 is not None,
         }
         item = WardrobeItem(
             id=str(uuid.uuid4()),
             user_id=user_id,
             name=f"{spec.get('color', '')} {spec.get('fabric', '')} {spec.get('garment_type', 'Outfit')}".strip(),
-            image_url=image_url,
+            image_url=wardrobe_image_url,
             category=spec.get('garment_type', 'custom'),
             metadata_json=wardrobe_meta,
         )
@@ -393,7 +444,7 @@ async def finalize_outfit(
         await db.commit()
         wardrobe_item_id = item.id
     except Exception as exc:
-        logger.warning('Wardrobe save failed: %s', exc)
+        logger.warning('Wardrobe save / profile update failed: %s', exc)
 
     # Extract reasoning from the last session history if available
     reasoning = None
