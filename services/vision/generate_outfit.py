@@ -71,6 +71,19 @@ async def generate_outfits(
                     continue
             except Exception as exc:
                 logger.warning("HF SDXL generation failed for variant %d: %s", i, exc)
+                
+        # Try Pollinations as secondary fallback if HF fails
+        try:
+            poll_bytes = await _pollinations_generate(prompt)
+            if poll_bytes and len(poll_bytes) > 500:
+                variants.append(OutfitVariant(
+                    image_base64=base64.b64encode(poll_bytes).decode("ascii"),
+                    prompt=prompt,
+                    clip_score=0.0,
+                ))
+                continue
+        except Exception as exc:
+            logger.warning("Pollinations generation failed for variant %d: %s", i, exc)
 
         # Fallback: deterministic placeholder — clearly marked as non-SDXL
         variants.append(OutfitVariant(
@@ -216,6 +229,13 @@ async def generate_from_spec(
             image_bytes = await _hf_sdxl_generate(prompt, settings)
         except Exception as exc:
             logger.warning("SDXL generation from spec failed: %s", exc)
+
+    if not image_bytes or len(image_bytes) < 500:
+        # Try Pollinations fallback
+        try:
+            image_bytes = await _pollinations_generate(prompt)
+        except Exception as exc:
+            logger.warning("Pollinations generation from spec failed: %s", exc)
 
     if not image_bytes or len(image_bytes) < 500:
         # Fallback: generate placeholder

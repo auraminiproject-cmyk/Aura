@@ -156,12 +156,32 @@ async def node_finalize(state: AgenticState) -> AgenticState:
         
     # Retrieve products
     params_data = state.get("design_params") or {}
-    products = await match_products(
-        outfit_description=state["message"],
-        max_price_inr=params_data.get("budget_inr"),
-        limit=5,
-        threshold=0.72
-    )
+    
+    products = []
+    try:
+        from services.retrieval.web_search import search_products
+        # Convert design_params to spec expected by web_search
+        garments = params_data.get("garment_types", [])
+        colors = params_data.get("colors", [])
+        spec = {
+            "garment_type": garments[0] if garments else "outfit",
+            "color": colors[0] if colors else "",
+            "occasion": params_data.get("occasion"),
+            "budget_inr": params_data.get("budget_inr")
+        }
+        products = await search_products(spec=spec, limit=5, max_price_inr=params_data.get("budget_inr"))
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Web search failed: {e}")
+        
+    if not products:
+        from services.retrieval.product_match import match_products
+        products = await match_products(
+            outfit_description=state["message"],
+            max_price_inr=params_data.get("budget_inr"),
+            limit=5,
+            threshold=0.72
+        )
     
     tailoring_pdf_b64 = None
     if len(products) < 2:
