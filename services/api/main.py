@@ -67,6 +67,10 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/api/v1")
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
+    @app.get("/")
+    async def root():
+        return {"message": "Aura Fashion AI API is running.", "docs": "/docs", "health": "/health"}
+
     @app.get("/health")
     async def health():
         groq_key = settings.groq_api_key
