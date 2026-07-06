@@ -122,16 +122,28 @@ async def voice_converse(
     # Load DB history into memory if empty
     await _load_history_if_needed(db, session_id)
 
-    # Step 3: Stylist LLM — negotiate outfit (with detected language)
-    reply_text, outfit_state = await stylist_respond(
-        transcript=transcript,
-        body_profile=body_profile,
+    # Step 3: Stylist LLM — negotiate outfit (with detected language) via Agentic Graph
+    from services.agent.graph import run_graph
+    
+    result = await run_graph(
+        message=transcript,
+        user_id=user_id,
         session_id=session_id,
-        detected_language=detected_lang,
+        language=detected_lang,
+        image_b64=None
     )
+    
+    reply_text = result.get("reply", "") or result.get("error", "Sorry, an error occurred.")
+    outfit_state = {
+        "intent": result.get("intent"),
+        "params": result.get("params"),
+        "outfits": result.get("outfits"),
+        "status": result.get("status"),
+        "error": result.get("error")
+    }
 
-    # Save conversation
-    await _ensure_db_session(db, session_id, user_id)
+    # Note: run_graph already saves the conversation internally via node_memory_save,
+    # but we also explicitly add it to the Conversation table for the frontend history.
     try:
         db.add(Conversation(session_id=session_id, role="user", content=transcript, language=detected_lang))
         db.add(Conversation(session_id=session_id, role="assistant", content=reply_text, language=detected_lang))
@@ -198,15 +210,26 @@ async def voice_converse_text(
     # Load DB history into memory if empty
     await _load_history_if_needed(db, session_id)
 
-    reply_text, outfit_state = await stylist_respond(
-        transcript=body.message,
-        body_profile=body_profile,
+    from services.agent.graph import run_graph
+    
+    result = await run_graph(
+        message=body.message,
+        user_id=user_id,
         session_id=session_id,
-        detected_language=body.language,
+        language=body.language,
+        image_b64=None
     )
+    
+    reply_text = result.get("reply", "") or result.get("error", "Sorry, an error occurred.")
+    outfit_state = {
+        "intent": result.get("intent"),
+        "params": result.get("params"),
+        "outfits": result.get("outfits"),
+        "status": result.get("status"),
+        "error": result.get("error")
+    }
 
     # Save conversation
-    await _ensure_db_session(db, session_id, user_id)
     try:
         db.add(Conversation(session_id=session_id, role="user", content=body.message, language=body.language))
         db.add(Conversation(session_id=session_id, role="assistant", content=reply_text, language=body.language))
@@ -257,272 +280,37 @@ async def finalize_outfit(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
-    """Finalize outfit: lock spec → generate image → tailoring → web search → try-on.
-
-    Enhanced pipeline:
-    1. Generate outfit image (HF SDXL)
-    2. Compute tailoring measurements (deterministic)
-    3. Real product search (DuckDuckGo)
-    4. Virtual try-on (HF Spaces)
-    5. Save to wardrobe
-    """
-    # Isolate session per user
+    """Finalize outfit: lock spec → generate image → tailoring → web search → try-on via Graph."""
     session_id = f"{user_id}-{body.session_id}"
+    from services.agent.graph import run_graph
     
-    session = get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found or expired")
-
-    if session.stage != OutfitStage.FINALIZED:
-        # Try to finalize via one more LLM call
-        reply_text, outfit_state = await stylist_respond(
-            transcript="Please finalize this outfit now.",
-            session_id=session_id,
-        )
-        session = get_session(session_id)
-        if not session or session.stage != OutfitStage.FINALIZED:
-            raise HTTPException(
-                status_code=400,
-                detail="Outfit not yet finalized. Continue the conversation first.",
-            )
-
-    spec = session.spec.to_dict()
-
-    # Fetch body profile for tailoring + try-on
-    body_profile = None
-    body_analysis = None
-    try:
-        result = await db.execute(
-            select(BodyProfile)
-            .where(BodyProfile.user_id == user_id)
-            .order_by(BodyProfile.created_at.desc())
-            .limit(1)
-        )
-        profile = result.scalar_one_or_none()
-        if profile and profile.measurements:
-            body_profile = profile.measurements
-    except Exception:
-        pass
-
-    # Phase D: Generate outfit image — capture bytes for inline delivery
-    image_url = None
+    result = await run_graph(
+        message="finalize",
+        user_id=user_id,
+        session_id=session_id,
+        language="en",
+        image_b64=None
+    )
+    
+    outfits = result.get("outfits") or []
     outfit_image_b64 = None
-    try:
-        from services.vision.generate_outfit import generate_from_spec, _hf_sdxl_generate, _pollinations_generate, _placeholder_png_base64
-        import hashlib as _hashlib
-
-        # Build prompt from spec (same logic as generate_from_spec)
-        _garment = spec.get('garment_type', 'outfit')
-        _fabric = spec.get('fabric', 'silk')
-        _color = spec.get('color', 'red')
-        _silhouette = spec.get('silhouette', '')
-        _occasion = spec.get('occasion', '')
-        _style = spec.get('style_notes', '')
+    image_url = None
+    if outfits:
+        outfit_image_b64 = outfits[0].get("image_base64")
+        image_url = outfits[0].get("image_url")
         
-        # Inject gender into prompt
-        _gender_str = "neutral"
-        if body_profile:
-            _meta = body_profile.get("_meta", {})
-            _gender_str = _meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
+    if result.get("error"):
+        logger.error(f"Finalize Graph Error: {result.get('error')}")
         
-        if _gender_str == "neutral":
-            # Fallback to User model explicit gender
-            from services.api.core.models import User
-            user_obj = await db.get(User, user_id)
-            if user_obj and user_obj.gender:
-                _gender_str = user_obj.gender
-        
-        _subject = "man" if _gender_str.lower() == "masculine" or _gender_str.lower() == "male" else "woman" if _gender_str.lower() == "feminine" or _gender_str.lower() == "female" else "person"
-        
-        _parts = [f'{_subject} wearing {_color} {_fabric} {_garment}',
-                  f'{_silhouette} silhouette' if _silhouette else '',
-                  f'for {_occasion}' if _occasion else '', _style,
-                  'high fashion editorial, studio lighting, full body, 4k']
-        _prompt = ', '.join(p for p in _parts if p)
-
-        from services.api.core.config import get_settings as _gs
-        from services.api.core.resilience import hf_breaker
-        _settings = _gs()
-        _img_bytes = None
-        if _settings.huggingface_api_key and hf_breaker.current_state != 'open':
-            try:
-                _img_bytes = await _hf_sdxl_generate(_prompt, _settings)
-            except Exception as e:
-                logger.warning('HF SDXL direct generation failed: %s', e)
-        
-        # Robust fallback using Pollinations (free, stable)
-        if not _img_bytes or len(_img_bytes) < 500:
-            try:
-                _img_bytes = await _pollinations_generate(_prompt)
-            except Exception as e:
-                logger.warning('Pollinations fallback failed: %s', e)
-
-        if not _img_bytes or len(_img_bytes) < 500:
-            _seed = _hashlib.sha256(_prompt.encode()).hexdigest()
-            _img_bytes = base64.b64decode(_placeholder_png_base64(_seed))
-
-        # Store base64 for inline delivery to mobile
-        outfit_image_b64 = base64.b64encode(_img_bytes).decode('ascii')
-
-        # Also try to get a URL (best-effort)
-        try:
-            image_url = await generate_from_spec(spec=spec, user_id=user_id)
-        except Exception:
-            pass
-    except Exception as exc:
-        logger.warning('Outfit image generation failed: %s', exc)
-
-    # Phase E: Compute tailoring measurements (deterministic)
-    tailoring_data = None
-    body_analysis = None
-    if body_profile:
-        try:
-            from services.agent.tailoring_calc import compute as compute_tailoring
-            from services.agent.body_analyzer import analyze as analyze_body
-
-            body_analysis_result = analyze_body(body_profile)
-            body_analysis = body_analysis_result.to_dict()
-            
-            # Inject gender for Virtual Try-On
-            meta = body_profile.get("_meta", {})
-            _vlm_gender = meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
-            if _vlm_gender == "neutral":
-                from services.api.core.models import User
-                user_obj = await db.get(User, user_id)
-                if user_obj and user_obj.gender:
-                    _vlm_gender = user_obj.gender
-            body_analysis["gender"] = _vlm_gender
-
-            tailoring = compute_tailoring(
-                garment_type=spec.get("garment_type", "kurta"),
-                fabric=spec.get("fabric", "cotton"),
-                measurements=body_profile,
-                body_type=body_analysis_result.body_type,
-            )
-            tailoring_data = tailoring.to_dict()
-            logger.info("[finalize] Tailoring computed for %s, body_type=%s, gender=%s",
-                        spec.get("garment_type"), body_analysis_result.body_type, body_analysis["gender"])
-        except Exception as exc:
-            logger.warning("Tailoring calculation failed: %s", exc)
-
-    # Phase F: Real product search (DuckDuckGo — real URLs)
-    web_matches: list[dict] = []
-    try:
-        from services.retrieval.web_search import search_products as real_search
-        web_matches = await real_search(
-            spec,
-            limit=5,
-            max_price_inr=spec.get("budget_inr"),
-        )
-        logger.info("[finalize] Found %d real products via web search", len(web_matches))
-    except Exception as exc:
-        logger.warning("Real web search failed, trying legacy: %s", exc)
-        # Fallback to legacy product match
-        try:
-            from services.retrieval.web_match import match_web_garments
-            web_matches = await match_web_garments(spec, limit=5)
-        except Exception as exc2:
-            logger.warning("Legacy web match also failed: %s", exc2)
-
-    # Phase G: Virtual try-on (HF Spaces — with user's actual photo if available)
-    tryon_image_b64 = None
-    try:
-        from services.vision.virtual_tryon import generate_tryon_image
-
-        # Extract user's front photo from BodyProfile (stored by avatar.py)
-        person_image_bytes = None
-        if body_profile and isinstance(body_profile, dict):
-            front_b64 = body_profile.get('_front_photo_b64')
-            if front_b64:
-                try:
-                    person_image_bytes = base64.b64decode(front_b64)
-                except Exception:
-                    pass
-
-        garment_image_bytes = base64.b64decode(outfit_image_b64) if outfit_image_b64 else None
-
-        tryon_bytes, tryon_engine = await generate_tryon_image(
-            spec=spec,
-            person_image_bytes=person_image_bytes,
-            garment_image_bytes=garment_image_bytes,
-            body_analysis=body_analysis,
-        )
-        if tryon_bytes and len(tryon_bytes) > 500:
-            tryon_image_b64 = base64.b64encode(tryon_bytes).decode('ascii')
-            logger.info('[finalize] Try-on image generated via %s (%d bytes)',
-                        tryon_engine, len(tryon_bytes))
-            # DO NOT clear outfit_image_b64 here so it can be uploaded
-    except Exception as exc:
-        logger.warning('Virtual try-on failed (non-blocking): %s', exc)
-
-    # Phase H: Upload to storage and save to wardrobe
-    wardrobe_item_id = None
-    try:
-        from services.api.core.storage import get_storage
-        storage = get_storage()
-        
-        wardrobe_image_url = image_url
-        if tryon_image_b64:
-            # Prefer try-on image as the wardrobe image URL
-            tryon_url = await storage.upload_bytes(base64.b64decode(tryon_image_b64), content_type="image/jpeg")
-            wardrobe_image_url = tryon_url
-            
-            # Update body profile with new try-on image
-            if profile:
-                # Need to update JSON column properly
-                current_measurements = dict(profile.measurements) if profile.measurements else {}
-                current_measurements['_front_photo_b64'] = tryon_image_b64
-                # Use flag_modified if SQLAlchemy requires it, or just re-assign
-                profile.measurements = current_measurements
-                db.add(profile)
-        
-        elif outfit_image_b64:
-            # Fallback to outfit image
-            outfit_url = await storage.upload_bytes(base64.b64decode(outfit_image_b64), content_type="image/png")
-            wardrobe_image_url = outfit_url
-
-        wardrobe_meta = {
-            **spec,
-            '_tailoring': tailoring_data,
-            '_has_tryon': tryon_image_b64 is not None,
-        }
-        item = WardrobeItem(
-            id=str(uuid.uuid4()),
-            user_id=user_id,
-            name=f"{spec.get('color', '')} {spec.get('fabric', '')} {spec.get('garment_type', 'Outfit')}".strip(),
-            image_url=wardrobe_image_url,
-            category=spec.get('garment_type', 'custom'),
-            metadata_json=wardrobe_meta,
-        )
-        db.add(item)
-        await db.commit()
-        wardrobe_item_id = item.id
-    except Exception as exc:
-        logger.warning('Wardrobe save / profile update failed: %s', exc)
-
-    # Extract reasoning from the last session history if available
-    reasoning = None
-    if session.history:
-        for msg in reversed(session.history):
-            if msg.get('role') == 'assistant' and '<think>' in (msg.get('content') or ''):
-                reasoning = msg['content']
-                break
-
-    # Reset the session so we don't get trapped in a generation loop!
-    from services.agent.stylist import OutfitStage, OutfitSpec
-    session.stage = OutfitStage.PROPOSING
-    session.spec = OutfitSpec(measurements=session.spec.measurements) # preserve body profile
-    session.turn_count = 0
-
     return FinalizeResponse(
-        spec=spec,
+        spec=result.get("params", {}),
         image_url=image_url,
         outfit_image_b64=outfit_image_b64,
-        wardrobe_item_id=wardrobe_item_id,
-        web_matches=web_matches,
-        tryon_image_b64=tryon_image_b64,
-        tailoring=tailoring_data,
-        reasoning=reasoning,
+        wardrobe_item_id=None,
+        web_matches=result.get("products") or [],
+        tryon_image_b64=result.get("composite_image_b64"),
+        tailoring={"pdf_base64": result.get("tailoring_pdf_base64")} if result.get("tailoring_pdf_base64") else None,
+        reasoning=None,
     )
 
 @router.get("/converse/history")
