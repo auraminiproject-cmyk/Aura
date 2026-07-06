@@ -62,6 +62,7 @@ async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
         gender=body.gender
     )
     db.add(user)
+    await db.flush()
     
     if body.profile_photo_b64:
         bp = BodyProfile(
@@ -101,6 +102,7 @@ async def guest_login(body: GuestLoginRequest, db: AsyncSession = Depends(get_db
         gender=body.gender
     )
     db.add(user)
+    await db.flush()
     
     if body.profile_photo_b64:
         bp = BodyProfile(
