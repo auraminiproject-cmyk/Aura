@@ -190,7 +190,8 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Try-On Failed (non-blocking): {e}")
-        return {**state, "error": f"Try-On Failed: {e}"}
+        # DO NOT set state["error"] here because it will block node_finalize from running!
+        return {**state, "tryon_error": f"Try-On Failed: {e}"}
 
 async def node_finalize(state: AgenticState) -> AgenticState:
     if state.get("error"): return state
