@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.api.core.database import get_db
-from services.api.core.models import User
+from services.api.core.models import User, BodyProfile
 from services.api.core.security import create_access_token, create_refresh_token, decode_token, get_current_user_id
 
 router = APIRouter()
@@ -29,6 +29,8 @@ class SignupRequest(BaseModel):
     email: str = Field(max_length=255)
     password: str = Field(min_length=6)
     display_name: str | None = Field(default=None, max_length=128)
+    gender: str | None = Field(default="Neutral", max_length=16)
+    profile_photo_b64: str | None = None
 
 class LoginRequest(BaseModel):
     email: str = Field(max_length=255)
@@ -36,6 +38,8 @@ class LoginRequest(BaseModel):
 
 class GuestLoginRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=128)
+    gender: str | None = Field(default="Neutral", max_length=16)
+    profile_photo_b64: str | None = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -54,9 +58,23 @@ async def signup(body: SignupRequest, db: AsyncSession = Depends(get_db)):
         id=str(uuid.uuid4()), 
         email=body.email, 
         hashed_password=hashed_password,
-        display_name=body.display_name or body.email.split("@")[0]
+        display_name=body.display_name or body.email.split("@")[0],
+        gender=body.gender
     )
     db.add(user)
+    
+    if body.profile_photo_b64:
+        bp = BodyProfile(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            measurements={
+                "_front_photo_b64": body.profile_photo_b64,
+                "_vlm_gender": body.gender,
+                "_pipeline": "profile_photo_signup"
+            }
+        )
+        db.add(bp)
+        
     await db.commit()
     
     token = create_access_token(user.id)
@@ -77,8 +95,25 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.post("/guest", response_model=TokenResponse)
 async def guest_login(body: GuestLoginRequest, db: AsyncSession = Depends(get_db)):
-    user = User(id=str(uuid.uuid4()), display_name=body.display_name or "Guest")
+    user = User(
+        id=str(uuid.uuid4()), 
+        display_name=body.display_name or "Guest",
+        gender=body.gender
+    )
     db.add(user)
+    
+    if body.profile_photo_b64:
+        bp = BodyProfile(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            measurements={
+                "_front_photo_b64": body.profile_photo_b64,
+                "_vlm_gender": body.gender,
+                "_pipeline": "profile_photo_signup"
+            }
+        )
+        db.add(bp)
+        
     await db.commit()
     token = create_access_token(user.id)
     refresh = create_refresh_token(user.id)

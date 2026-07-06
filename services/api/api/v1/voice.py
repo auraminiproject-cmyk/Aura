@@ -71,7 +71,6 @@ async def voice_converse(
     audio: UploadFile = File(...),
     session_id: str = Form("default"),
     language: str = Form(""),
-    gender: str | None = Form(None),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -117,10 +116,6 @@ async def voice_converse(
         profile = result.scalar_one_or_none()
         if profile and profile.measurements:
             body_profile = profile.measurements
-            if gender:
-                if "_meta" not in body_profile:
-                    body_profile["_meta"] = {}
-                body_profile["_meta"]["_vlm_gender"] = gender
     except Exception:
         pass  # body profile is optional
 
@@ -171,9 +166,8 @@ async def voice_converse(
 class TextConverseRequest(BaseModel):
     """Text-based conversation (for testing / text-chat fallback)."""
     message: str
-    session_id: str | None = "default"
-    language: str | None = "te"
-    gender: str | None = None
+    session_id: str = "default"
+    language: str = "te"
 
 
 @router.post("/converse-text")
@@ -198,10 +192,6 @@ async def voice_converse_text(
         profile = result.scalar_one_or_none()
         if profile and profile.measurements:
             body_profile = profile.measurements
-            if body.gender:
-                if "_meta" not in body_profile:
-                    body_profile["_meta"] = {}
-                body_profile["_meta"]["_vlm_gender"] = body.gender
     except Exception:
         pass
 
@@ -334,7 +324,15 @@ async def finalize_outfit(
         if body_profile:
             _meta = body_profile.get("_meta", {})
             _gender_str = _meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
-        _subject = "man" if _gender_str.lower() == "masculine" else "woman" if _gender_str.lower() == "feminine" else "person"
+        
+        if _gender_str == "neutral":
+            # Fallback to User model explicit gender
+            from services.api.core.models import User
+            user_obj = await db.get(User, user_id)
+            if user_obj and user_obj.gender:
+                _gender_str = user_obj.gender
+        
+        _subject = "man" if _gender_str.lower() == "masculine" or _gender_str.lower() == "male" else "woman" if _gender_str.lower() == "feminine" or _gender_str.lower() == "female" else "person"
         
         _parts = [f'{_subject} wearing {_color} {_fabric} {_garment}',
                   f'{_silhouette} silhouette' if _silhouette else '',
@@ -387,7 +385,13 @@ async def finalize_outfit(
             
             # Inject gender for Virtual Try-On
             meta = body_profile.get("_meta", {})
-            body_analysis["gender"] = meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
+            _vlm_gender = meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
+            if _vlm_gender == "neutral":
+                from services.api.core.models import User
+                user_obj = await db.get(User, user_id)
+                if user_obj and user_obj.gender:
+                    _vlm_gender = user_obj.gender
+            body_analysis["gender"] = _vlm_gender
 
             tailoring = compute_tailoring(
                 garment_type=spec.get("garment_type", "kurta"),
