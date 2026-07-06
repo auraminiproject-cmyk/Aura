@@ -36,74 +36,96 @@ async def try_on_with_spaces(
     person_image_bytes: bytes,
     garment_image_bytes: bytes,
 ) -> bytes | None:
-    """Call a HuggingFace Space for virtual try-on.
+    """Call a HuggingFace Space for virtual try-on concurrently.
 
-    Uses the Gradio client to call free Spaces. Returns composited image bytes.
+    Submits requests to multiple free Spaces simultaneously.
+    Returns the first successful result and cancels the rest.
     """
     try:
         from gradio_client import Client, handle_file  # type: ignore[import-untyped]
         import tempfile
         import os
 
+        # Write images to temp files (Gradio client needs file paths)
+        f_person = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        f_person.write(person_image_bytes)
+        f_person.close()
+        person_path = f_person.name
+
+        f_garment = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        f_garment.write(garment_image_bytes)
+        f_garment.close()
+        garment_path = f_garment.name
+
         loop = asyncio.get_event_loop()
 
-        def _call_space():
-            # Write images to temp files (Gradio client needs file paths)
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f_person:
-                f_person.write(person_image_bytes)
-                person_path = f_person.name
-            with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f_garment:
-                f_garment.write(garment_image_bytes)
-                garment_path = f_garment.name
-
+        def _call_single_space(space_id: str) -> bytes | None:
             try:
-                # Try each Space until one works
-                for space_id in _TRYON_SPACES:
-                    try:
-                        client = Client(space_id)
-                        result = client.predict(
-                            handle_file(person_path),
-                            handle_file(garment_path),
-                            api_name="/tryon",
-                        )
-                        # Result is typically a file path or tuple
-                        if isinstance(result, str) and os.path.exists(result):
-                            with open(result, "rb") as f:
+                client = Client(space_id)
+                result = client.predict(
+                    handle_file(person_path),
+                    handle_file(garment_path),
+                    api_name="/tryon",
+                )
+                if isinstance(result, str) and os.path.exists(result):
+                    with open(result, "rb") as f:
+                        return f.read()
+                if isinstance(result, (list, tuple)):
+                    for item in result:
+                        if isinstance(item, str) and os.path.exists(item):
+                            with open(item, "rb") as f:
                                 return f.read()
-                        if isinstance(result, (list, tuple)):
-                            for item in result:
-                                if isinstance(item, str) and os.path.exists(item):
-                                    with open(item, "rb") as f:
-                                        return f.read()
-                        logger.info("Try-on Space %s returned unexpected type: %s", space_id, type(result))
-                    except Exception as exc:
-                        logger.warning("Space %s failed: %s", space_id, exc)
-                        continue
-            finally:
-                try:
-                    os.unlink(person_path)
-                except OSError:
-                    pass
-                try:
-                    os.unlink(garment_path)
-                except OSError:
-                    pass
+                logger.info("Space %s returned unexpected type: %s", space_id, type(result))
+            except Exception as exc:
+                logger.debug("Space %s failed: %s", space_id, exc)
             return None
 
-        result = await asyncio.wait_for(
-            loop.run_in_executor(None, _call_space),
-            timeout=120.0,  # Spaces can be slow on cold start
-        )
-        return result
+        async def _run_async(space_id: str):
+            # Run the blocking Gradio client call in an executor thread
+            res = await loop.run_in_executor(None, _call_single_space, space_id)
+            if not res:
+                raise RuntimeError(f"Space {space_id} failed or returned None")
+            return res
+
+        try:
+            tasks = [_run_async(sid) for sid in _TRYON_SPACES]
+            # Use FIRST_COMPLETED to return immediately when one succeeds
+            done, pending = await asyncio.wait(
+                tasks,
+                timeout=90.0,
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            # Cancel all pending tasks so they don't leak
+            for p in pending:
+                p.cancel()
+
+            # Find the first successful result
+            for task in done:
+                try:
+                    result = task.result()
+                    if result:
+                        return result
+                except Exception:
+                    pass
+                    
+            logger.warning("All Try-On Spaces failed or timed out.")
+            return None
+        finally:
+            try:
+                os.unlink(person_path)
+            except OSError:
+                pass
+            try:
+                os.unlink(garment_path)
+            except OSError:
+                pass
 
     except ImportError:
         logger.warning("gradio_client not installed — pip install gradio_client")
         return None
-    except asyncio.TimeoutError:
-        logger.warning("Try-on Space call timed out")
-        return None
     except Exception as exc:
-        logger.warning("Try-on Spaces failed: %s", exc)
+        logger.warning("Try-on Spaces concurrent call failed: %s", exc)
         return None
 
 

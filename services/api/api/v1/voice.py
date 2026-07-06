@@ -74,6 +74,9 @@ async def voice_converse(
     if len(audio_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Audio too large (max 10MB)")
 
+    # Isolate session per user
+    session_id = f"{user_id}-{session_id}"
+
     # Step 1: ASR — Groq Whisper (primary) → Sarvam → HF Whisper
     try:
         transcript, detected_lang, asr_engine = await transcribe_with_fallback(
@@ -158,6 +161,9 @@ async def voice_converse_text(
     db: AsyncSession = Depends(get_db),
 ):
     """Text-based stylist conversation — also generates TTS audio for the reply."""
+    # Isolate session per user
+    session_id = f"{user_id}-{body.session_id}"
+
     # Fetch body profile
     body_profile = None
     try:
@@ -176,15 +182,15 @@ async def voice_converse_text(
     reply_text, outfit_state = await stylist_respond(
         transcript=body.message,
         body_profile=body_profile,
-        session_id=body.session_id,
+        session_id=session_id,
         detected_language=body.language,
     )
 
     # Save conversation
-    await _ensure_db_session(db, body.session_id, user_id)
+    await _ensure_db_session(db, session_id, user_id)
     try:
-        db.add(Conversation(session_id=body.session_id, role="user", content=body.message, language=body.language))
-        db.add(Conversation(session_id=body.session_id, role="assistant", content=reply_text, language=body.language))
+        db.add(Conversation(session_id=session_id, role="user", content=body.message, language=body.language))
+        db.add(Conversation(session_id=session_id, role="assistant", content=reply_text, language=body.language))
         await db.commit()
     except Exception as exc:
         logger.warning("[voice/converse-text] Failed to save conversation: %s", exc)
@@ -241,7 +247,10 @@ async def finalize_outfit(
     4. Virtual try-on (HF Spaces)
     5. Save to wardrobe
     """
-    session = get_session(body.session_id)
+    # Isolate session per user
+    session_id = f"{user_id}-{body.session_id}"
+    
+    session = get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found or expired")
 
@@ -249,9 +258,9 @@ async def finalize_outfit(
         # Try to finalize via one more LLM call
         reply_text, outfit_state = await stylist_respond(
             transcript="Please finalize this outfit now.",
-            session_id=body.session_id,
+            session_id=session_id,
         )
-        session = get_session(body.session_id)
+        session = get_session(session_id)
         if not session or session.stage != OutfitStage.FINALIZED:
             raise HTTPException(
                 status_code=400,
@@ -464,3 +473,31 @@ async def finalize_outfit(
         tailoring=tailoring_data,
         reasoning=reasoning,
     )
+
+@router.get("/converse/history")
+async def get_voice_history(
+    session_id: str = "default",
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve chat history for a given session."""
+    actual_session_id = f"{user_id}-{session_id}"
+    result = await db.execute(
+        select(Conversation)
+        .where(Conversation.session_id == actual_session_id)
+        .order_by(Conversation.created_at.asc())
+    )
+    conversations = result.scalars().all()
+    
+    history = []
+    for conv in conversations:
+        history.append({
+            "id": conv.id,
+            "role": conv.role,
+            "content": conv.content,
+            "language": conv.language,
+            "created_at": conv.created_at.isoformat() if conv.created_at else None
+        })
+        
+    return {"history": history}
+

@@ -93,6 +93,12 @@ def get_session(session_id: str) -> OutfitNegotiationState | None:
     return None
 
 
+def clear_session(session_id: str):
+    """Clear session state (e.g. when user starts fresh)."""
+    if session_id in _sessions:
+        del _sessions[session_id]
+
+
 # Finalize detection keywords
 FINALIZE_KEYWORDS = [
     "finalize", "finalise", "confirm", "done", "lock it", "that's it",

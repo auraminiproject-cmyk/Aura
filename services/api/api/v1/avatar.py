@@ -20,6 +20,9 @@ from services.vision.body_reconstruct import (
     reconstruct_body,
     validate_image_quality,
 )
+from services.agent.stylist import clear_session
+from sqlalchemy import delete
+from services.api.core.models import Conversation
 
 router = APIRouter()
 MAX_UPLOAD = 10 * 1024 * 1024
@@ -192,6 +195,15 @@ async def analyze_body(
 
     await db.commit()
     await db.refresh(profile)
+
+    # Clear old chat history for this user's default session
+    try:
+        sess_id = f"{user_id}-voice-default"
+        clear_session(sess_id)
+        await db.execute(delete(Conversation).where(Conversation.session_id == sess_id))
+        await db.commit()
+    except Exception as e:
+        logger.warning("Failed to clear chat history: %s", e)
 
     return AnalyzeResponse(
         profile_id=profile.id,

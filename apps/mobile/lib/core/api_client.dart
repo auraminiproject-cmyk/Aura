@@ -234,4 +234,12 @@ class ApiClient {
     });
     return resp.data as Map<String, dynamic>;
   }
+
+  /// Get voice history for a session
+  Future<List<dynamic>> getVoiceHistory(String sessionId) async {
+    final resp = await _dio.get('/api/v1/voice/converse/history', queryParameters: {
+      'session_id': sessionId,
+    });
+    return (resp.data['history'] as List?) ?? [];
+  }
 }

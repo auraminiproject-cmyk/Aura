@@ -52,6 +52,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..repeat(reverse: true);
+    
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final history = await api.getVoiceHistory(_voiceSessionId);
+      if (history.isNotEmpty && mounted) {
+        setState(() {
+          for (final msg in history) {
+            _messages.add({
+              'role': msg['role'],
+              'text': msg['content'],
+            });
+          }
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint('Failed to load chat history: $e');
+    }
   }
 
   @override
