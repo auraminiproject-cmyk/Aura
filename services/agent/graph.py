@@ -93,6 +93,7 @@ async def node_stylist(state: AgenticState) -> AgenticState:
     return {**state, "reply": reply}
 
 async def node_outfit_gen(state: AgenticState) -> AgenticState:
+    if state.get("error"): return state
     if state.get("plan_goal") not in ("PROPOSE_OUTFIT", "FINALIZE"):
         return state
         
@@ -104,6 +105,7 @@ async def node_outfit_gen(state: AgenticState) -> AgenticState:
         return {**state, "error": f"Outfit Generation Failed: {e}"}
 
 async def node_tryon(state: AgenticState) -> AgenticState:
+    if state.get("error"): return state
     if state.get("plan_goal") not in ("PROPOSE_OUTFIT", "FINALIZE"):
         return state
         
@@ -115,7 +117,7 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     avatar_url = profile.get("avatar_image_url")
     
     if not avatar_url and not state.get("image_b64"):
-        return {**state, "error": "Avatar missing."}
+        return {**state, "error": "Avatar missing. Please upload a full-body photo for try-on."}
         
     person_bytes = None
     if state.get("image_b64"):
@@ -123,28 +125,28 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     else:
         # In a real app we'd fetch the avatar_url bytes here.
         # For this prototype we will assume image_b64 is provided or fail.
-        return {**state, "error": "Avatar missing."}
+        return {**state, "error": "Avatar missing. Please upload a full-body photo for try-on."}
         
     garment_b64 = outfits[0].get("image_url") or outfits[0].get("image_base64")
     if not garment_b64:
-        # Extract base64 from data URI if needed
-        pass
-    # Assuming garment_b64 is raw base64 (clean up data uri prefix if present)
+        return {**state, "error": "Try-On Failed: Garment image missing."}
+        
     if garment_b64 and garment_b64.startswith("data:image"):
         garment_b64 = garment_b64.split(",")[1]
         
     garment_bytes = base64.b64decode(garment_b64) if garment_b64 else None
     
     if not garment_bytes:
-        return state
+        return {**state, "error": "Try-On Failed: Invalid garment image data."}
         
     try:
         composite = await TryOnAgent.apply_garment(person_bytes, garment_bytes)
         return {**state, "composite_image_b64": base64.b64encode(composite).decode("ascii")}
     except Exception as e:
-        return {**state, "error": str(e)}
+        return {**state, "error": f"Try-On Failed: {e}"}
 
 async def node_finalize(state: AgenticState) -> AgenticState:
+    if state.get("error"): return state
     if state.get("plan_goal") != "FINALIZE":
         return state
         
@@ -171,17 +173,23 @@ async def node_finalize(state: AgenticState) -> AgenticState:
     # Save to Wardrobe
     outfits = state.get("outfits")
     if outfits:
-        await WardrobeAgent.save_to_wardrobe(
-            state["user_id"],
-            outfits[0],
-            state.get("composite_image_b64")
-        )
+        try:
+            await WardrobeAgent.save_to_wardrobe(
+                state["user_id"],
+                outfits[0],
+                state.get("composite_image_b64")
+            )
+        except Exception as e:
+            return {**state, "error": f"Wardrobe Save Failed: {e}"}
         
     # Update status
     return {**state, "products": products, "tailoring_pdf_base64": tailoring_pdf_b64, "status": "finalized"}
 
 async def node_memory_save(state: AgenticState) -> AgenticState:
-    await MemoryAgent.update_state(state["session_id"], state.get("context", {}), state.get("status", "active"))
+    status = state.get("status", "active")
+    if state.get("error"):
+        status = "error"
+    await MemoryAgent.update_state(state["session_id"], state.get("context", {}), status)
     return state
 
 
