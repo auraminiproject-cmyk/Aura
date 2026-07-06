@@ -87,8 +87,10 @@ async def voice_converse(
     if len(audio_bytes) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Audio too large (max 10MB)")
 
-    # Isolate session per user
-    session_id = f"{user_id}-{session_id}"
+    # Isolate default session per user
+    if session_id == "default" or len(session_id) < 10:
+        import hashlib
+        session_id = "def-" + hashlib.md5(user_id.encode()).hexdigest()[:32]
 
     # Step 1: ASR — Groq Whisper (primary) → Sarvam → HF Whisper
     try:
@@ -190,8 +192,12 @@ async def voice_converse_text(
     db: AsyncSession = Depends(get_db),
 ):
     """Text-based stylist conversation — also generates TTS audio for the reply."""
-    # Isolate session per user
-    session_id = f"{user_id}-{body.session_id}"
+    # Isolate default session per user
+    if body.session_id == "default" or len(body.session_id) < 10:
+        import hashlib
+        session_id = "def-" + hashlib.md5(user_id.encode()).hexdigest()[:32]
+    else:
+        session_id = body.session_id
 
     # Fetch body profile
     body_profile = None
@@ -283,7 +289,11 @@ async def finalize_outfit(
     db: AsyncSession = Depends(get_db),
 ):
     """Finalize outfit: lock spec → generate image → tailoring → web search → try-on via Graph."""
-    session_id = f"{user_id}-{body.session_id}"
+    if body.session_id == "default" or len(body.session_id) < 10:
+        import hashlib
+        session_id = "def-" + hashlib.md5(user_id.encode()).hexdigest()[:32]
+    else:
+        session_id = body.session_id
     from services.agent.graph import run_graph
     
     result = await run_graph(
@@ -322,10 +332,17 @@ async def get_voice_history(
     db: AsyncSession = Depends(get_db),
 ):
     """Retrieve chat history for a given session."""
-    actual_session_id = f"{user_id}-{session_id}"
+    if session_id == "default" or len(session_id) < 10:
+        import hashlib
+        actual_session_id = "def-" + hashlib.md5(user_id.encode()).hexdigest()[:32]
+    else:
+        actual_session_id = session_id
+        
     result = await db.execute(
         select(Conversation)
+        .join(DbSession, DbSession.id == Conversation.session_id)
         .where(Conversation.session_id == actual_session_id)
+        .where(DbSession.user_id == user_id)
         .order_by(Conversation.created_at.asc())
     )
     conversations = result.scalars().all()
@@ -369,10 +386,10 @@ async def get_voice_sessions(
         first_msg = msg_result.scalars().first()
         title = first_msg.content[:40] + "..." if first_msg else "New Design Session"
         
-        # Strip user_id from session id for mobile app consumption
+        # Translate back default session
         display_id = sess.id
-        if display_id.startswith(f"{user_id}-"):
-            display_id = display_id[len(user_id)+1:]
+        if display_id.startswith("def-"):
+            display_id = "default"
             
         session_list.append({
             "id": display_id,
