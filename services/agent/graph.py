@@ -103,7 +103,7 @@ async def node_outfit_gen(state: AgenticState) -> AgenticState:
     
     garment = garments[0] if garments else ""
     color = colors[0] if colors else ""
-    gender = state.get("profile_data", {}).get("gender", "neutral")
+    gender = state.get("profile_data", {}).get("gender") or "neutral"
     
     brief_parts = [gender]
     if color: brief_parts.append(color)
