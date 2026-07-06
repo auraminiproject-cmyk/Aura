@@ -115,13 +115,17 @@ async def node_tryon(state: AgenticState) -> AgenticState:
         
     profile = state.get("profile_data", {})
     avatar_url = profile.get("avatar_image_url")
+    measurements = profile.get("measurements") or {}
+    avatar_b64 = measurements.get("_front_photo_b64")
     
-    if not avatar_url and not state.get("image_b64"):
+    if not avatar_url and not state.get("image_b64") and not avatar_b64:
         return {**state, "error": "Avatar missing. Please upload a full-body photo for try-on."}
         
     person_bytes = None
     if state.get("image_b64"):
         person_bytes = base64.b64decode(state["image_b64"])
+    elif avatar_b64:
+        person_bytes = base64.b64decode(avatar_b64)
     else:
         # In a real app we'd fetch the avatar_url bytes here.
         # For this prototype we will assume image_b64 is provided or fail.
