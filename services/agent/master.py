@@ -88,12 +88,4 @@ async def synthesize_response(state: AgentState) -> str:
         )
 
 
-async def run_fashion_agent(
-    message: str,
-    *,
-    history: list[dict[str, Any]] | None = None,
-    language: str = "te",
-) -> dict[str, Any]:
-    from services.agent.graph import run_graph
 
-    return await run_graph(message, history=history, language=language)

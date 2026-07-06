@@ -9,7 +9,7 @@ from services.api.core.moderation import moderate_text
 from services.api.core.models import Session
 from services.api.core.rate_limit import limiter
 from services.api.core.security import get_current_user_id
-from services.api.services.orchestrator import run_design_session
+from services.agent.graph import run_graph
 
 router = APIRouter()
 
@@ -33,12 +33,14 @@ async def full_design_flow(
         return {"error": reason, "blocked": True}
 
     session_id = str(uuid.uuid4())
-    db.add(Session(id=session_id, user_id=user_id))
+    db.add(Session(id=session_id, user_id=user_id, status="active"))
     await db.commit()
 
-    result = await run_design_session(
-        body.message,
+    result = await run_graph(
+        message=body.message,
+        user_id=user_id,
+        session_id=session_id,
         language=body.language,
-        num_variants=body.num_variants,
+        image_b64=None
     )
     return {"session_id": session_id, **result}

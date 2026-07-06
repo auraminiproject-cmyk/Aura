@@ -28,7 +28,10 @@ class Session(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="active")  # active, finalized, refining
+    context_json: Mapped[dict | None] = mapped_column(JSON)  # stores planner state, intent, memory
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
 class Conversation(Base):
@@ -39,6 +42,7 @@ class Conversation(Base):
     role: Mapped[str] = mapped_column(String(16))
     content: Mapped[str] = mapped_column(Text)
     language: Mapped[str | None] = mapped_column(String(8))
+    metadata_json: Mapped[dict | None] = mapped_column(JSON)  # Stores outfits, products, try-on images
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -47,9 +51,13 @@ class BodyProfile(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    profile_type: Mapped[str] = mapped_column(String(32), default="primary") # primary or sub_profile
+    profile_name: Mapped[str | None] = mapped_column(String(128))
+    gender: Mapped[str | None] = mapped_column(String(16))
     smplx_params: Mapped[dict | None] = mapped_column(JSON)
     glb_url: Mapped[str | None] = mapped_column(String(512))
     measurements: Mapped[dict | None] = mapped_column(JSON)
+    avatar_image_url: Mapped[str | None] = mapped_column(String(1024))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -1,6 +1,10 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/api_provider.dart';
 
@@ -18,10 +22,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
-  String _selectedGender = 'female'; // Default selection
   bool _isSignup = false;
   bool _loading = false;
   String? _error;
+  String _gender = 'Neutral';
+  File? _profilePhoto;
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
 
@@ -43,6 +48,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     _nameController.dispose();
     _fadeCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 80,
+    );
+    if (pickedFile != null) {
+      setState(() {
+        _profilePhoto = File(pickedFile.path);
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -69,6 +88,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     final userIdState = ref.read(currentUserIdProvider.notifier);
 
     final name = _nameController.text.trim();
+    String? photoB64;
+    if (_isSignup && _profilePhoto != null) {
+      final bytes = await _profilePhoto!.readAsBytes();
+      photoB64 = base64Encode(bytes);
+    }
 
     final errorMsg = await performAuth(
       client,
@@ -80,7 +104,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       email: email,
       password: password,
       displayName: name.isNotEmpty ? name : null,
-      gender: _selectedGender,
+      gender: _isSignup ? _gender : null,
+      profilePhotoB64: photoB64,
     );
 
     if (errorMsg == null) {
@@ -257,38 +282,75 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       onSubmitted: (_) => _submit(),
                     ),
                   ),
-                ],
-                const SizedBox(height: 12),
-                // Gender Dropdown
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  decoration: BoxDecoration(
+                  const SizedBox(height: 12),
+                  // Gender Dropdown
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                      ),
+                      color: Colors.white.withValues(alpha: 0.05),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _gender,
+                        dropdownColor: const Color(0xFF1A1A24),
+                        isExpanded: true,
+                        icon: Icon(Icons.arrow_drop_down, color: Colors.white.withValues(alpha: 0.4)),
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        items: ['Neutral', 'Masculine', 'Feminine'].map((String value) {
+                          return DropdownMenuItem<String>(
+                            value: value,
+                            child: Text(value),
+                          );
+                        }).toList(),
+                        onChanged: (newValue) {
+                          if (newValue != null) {
+                            setState(() => _gender = newValue);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Profile Photo Picker
+                  InkWell(
+                    onTap: _pickImage,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                        ),
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.photo_camera_outlined,
+                            color: Colors.white.withValues(alpha: 0.4),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text(
+                              _profilePhoto != null ? 'Photo selected' : 'Upload profile photo (optional)',
+                              style: TextStyle(
+                                color: _profilePhoto != null ? Colors.white : Colors.white.withValues(alpha: 0.3),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                          if (_profilePhoto != null)
+                            const Icon(Icons.check_circle, color: Color(0xFFD4AF37)),
+                        ],
+                      ),
                     ),
-                    color: Colors.white.withValues(alpha: 0.05),
                   ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: _selectedGender,
-                      isExpanded: true,
-                      dropdownColor: const Color(0xFF1A1A24),
-                      icon: Icon(Icons.arrow_drop_down, color: Colors.white.withValues(alpha: 0.4)),
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                      items: const [
-                        DropdownMenuItem(value: 'male', child: Text('Male')),
-                        DropdownMenuItem(value: 'female', child: Text('Female')),
-                        DropdownMenuItem(value: 'other', child: Text('Other')),
-                      ],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedGender = value);
-                        }
-                      },
-                    ),
-                  ),
-                ),
+                ],
                 const SizedBox(height: 20),
                 // Error message
                 if (_error != null)

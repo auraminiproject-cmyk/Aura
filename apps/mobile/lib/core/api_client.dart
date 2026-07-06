@@ -15,7 +15,6 @@ class ApiClient {
 
   final Dio _dio;
   String? userId;
-  String? gender;
 
   void setToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
@@ -27,9 +26,15 @@ class ApiClient {
     return resp.statusCode == 200;
   }
 
-  Future<Map<String, dynamic>> guestLogin({String? displayName}) async {
+  Future<Map<String, dynamic>> guestLogin({
+    String? displayName,
+    String? gender,
+    String? profilePhotoB64,
+  }) async {
     final resp = await _dio.post('/api/v1/auth/guest', data: {
-      'display_name': displayName ?? 'User',
+      if (displayName != null) 'display_name': displayName,
+      if (gender != null) 'gender': gender,
+      if (profilePhotoB64 != null) 'profile_photo_b64': profilePhotoB64,
     });
     final data = resp.data as Map<String, dynamic>;
     setToken(data['access_token'] as String);
@@ -48,11 +53,19 @@ class ApiClient {
     return data;
   }
 
-  Future<Map<String, dynamic>> signup({required String email, required String password, required String displayName}) async {
+  Future<Map<String, dynamic>> signup({
+    required String email, 
+    required String password, 
+    required String displayName,
+    String? gender,
+    String? profilePhotoB64,
+  }) async {
     final resp = await _dio.post('/api/v1/auth/signup', data: {
       'email': email,
       'password': password,
       'display_name': displayName,
+      if (gender != null) 'gender': gender,
+      if (profilePhotoB64 != null) 'profile_photo_b64': profilePhotoB64,
     });
     final data = resp.data as Map<String, dynamic>;
     setToken(data['access_token'] as String);
@@ -120,7 +133,6 @@ class ApiClient {
       if (sidePath != null)
         'side': await MultipartFile.fromFile(sidePath, filename: 'side.jpg'),
       'height_cm': heightCm.toString(),
-      if (gender != null) 'gender': gender,
     });
     final resp = await _dio.post('/api/v1/avatar/analyze', data: form);
     return resp.data as Map<String, dynamic>;
@@ -206,7 +218,6 @@ class ApiClient {
       'audio': await MultipartFile.fromFile(audioPath, filename: 'audio.wav'),
       'session_id': sessionId,
       'language': language,
-      if (gender != null) 'gender': gender,
     });
     final resp = await _dio.post('/api/v1/voice/converse', data: form);
     return resp.data as Map<String, dynamic>;
@@ -224,7 +235,6 @@ class ApiClient {
       'message': message,
       'session_id': sessionId,
       'language': language,
-      if (gender != null) 'gender': gender,
     });
     return resp.data as Map<String, dynamic>;
   }
