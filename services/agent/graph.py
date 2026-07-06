@@ -184,11 +184,13 @@ async def node_tryon(state: AgenticState) -> AgenticState:
         
     try:
         composite = await TryOnAgent.apply_garment(person_bytes, garment_bytes)
-        return {**state, "composite_image_b64": base64.b64encode(composite).decode("ascii")}
+        if composite:
+            return {**state, "composite_image_b64": base64.b64encode(composite).decode("ascii")}
+        return state
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"Try-On Failed (non-blocking): {e}")
-        return state
+        return {**state, "error": f"Try-On Failed: {e}"}
 
 async def node_finalize(state: AgenticState) -> AgenticState:
     if state.get("error"): return state

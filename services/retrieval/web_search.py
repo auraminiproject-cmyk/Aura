@@ -40,10 +40,10 @@ def _build_search_queries(spec: dict[str, Any]) -> list[str]:
         primary = " ".join(primary_parts) + " buy online India"
         queries.append(primary)
 
-    # Platform-specific queries
+    # Platform-specific queries using site operator for specific product links
     if garment:
-        queries.append(f"{color} {garment} myntra")
-        queries.append(f"{fabric} {garment} ajio")
+        queries.append(f"site:myntra.com {color} {garment} buy")
+        queries.append(f"site:ajio.com {fabric} {garment} online")
 
     # Budget-filtered query
     if budget and garment:
