@@ -139,6 +139,7 @@ async def voice_converse(
         "params": result.get("params"),
         "outfits": result.get("outfits"),
         "status": result.get("status"),
+        "stage": result.get("status"), # For flutter app backward compatibility
         "error": result.get("error")
     }
 
@@ -226,6 +227,7 @@ async def voice_converse_text(
         "params": result.get("params"),
         "outfits": result.get("outfits"),
         "status": result.get("status"),
+        "stage": result.get("status"), # For flutter app backward compatibility
         "error": result.get("error")
     }
 
