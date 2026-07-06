@@ -46,10 +46,11 @@ def extract_params_heuristic(message: str) -> DesignParams:
     return params
 
 
-async def extract_params_llm(message: str, language: str) -> DesignParams:
+async def extract_params_llm(message: str, language: str, gender: str = "neutral") -> DesignParams:
     system = (
         "Extract fashion design parameters as JSON with keys: "
         "occasion, budget_inr, colors (array), body_type, cultural_context, garment_types (array). "
+        f"The client's gender is '{gender}'. If the user asks for a general outfit without naming a specific clothing item, you MUST infer 1-2 appropriate specific garment types (e.g. ['suit'] for men's formal, or ['sherwani'] for Indian weddings, or ['lehenga'] for women). NEVER just return ['outfit'] or an empty array if an outfit is requested. "
         "Return ONLY valid JSON."
     )
     try:
