@@ -15,6 +15,7 @@ class ApiClient {
 
   final Dio _dio;
   String? userId;
+  String? gender;
 
   void setToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
@@ -119,6 +120,7 @@ class ApiClient {
       if (sidePath != null)
         'side': await MultipartFile.fromFile(sidePath, filename: 'side.jpg'),
       'height_cm': heightCm.toString(),
+      if (gender != null) 'gender': gender,
     });
     final resp = await _dio.post('/api/v1/avatar/analyze', data: form);
     return resp.data as Map<String, dynamic>;
@@ -204,6 +206,7 @@ class ApiClient {
       'audio': await MultipartFile.fromFile(audioPath, filename: 'audio.wav'),
       'session_id': sessionId,
       'language': language,
+      if (gender != null) 'gender': gender,
     });
     final resp = await _dio.post('/api/v1/voice/converse', data: form);
     return resp.data as Map<String, dynamic>;
@@ -221,6 +224,7 @@ class ApiClient {
       'message': message,
       'session_id': sessionId,
       'language': language,
+      if (gender != null) 'gender': gender,
     });
     return resp.data as Map<String, dynamic>;
   }

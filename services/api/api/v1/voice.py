@@ -71,6 +71,7 @@ async def voice_converse(
     audio: UploadFile = File(...),
     session_id: str = Form("default"),
     language: str = Form(""),
+    gender: str | None = Form(None),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -116,6 +117,10 @@ async def voice_converse(
         profile = result.scalar_one_or_none()
         if profile and profile.measurements:
             body_profile = profile.measurements
+            if gender:
+                if "_meta" not in body_profile:
+                    body_profile["_meta"] = {}
+                body_profile["_meta"]["_vlm_gender"] = gender
     except Exception:
         pass  # body profile is optional
 
@@ -166,8 +171,9 @@ async def voice_converse(
 class TextConverseRequest(BaseModel):
     """Text-based conversation (for testing / text-chat fallback)."""
     message: str
-    session_id: str = "default"
-    language: str = "te"
+    session_id: str | None = "default"
+    language: str | None = "te"
+    gender: str | None = None
 
 
 @router.post("/converse-text")
@@ -192,6 +198,10 @@ async def voice_converse_text(
         profile = result.scalar_one_or_none()
         if profile and profile.measurements:
             body_profile = profile.measurements
+            if body.gender:
+                if "_meta" not in body_profile:
+                    body_profile["_meta"] = {}
+                body_profile["_meta"]["_vlm_gender"] = body.gender
     except Exception:
         pass
 
@@ -291,7 +301,6 @@ async def finalize_outfit(
     # Fetch body profile for tailoring + try-on
     body_profile = None
     body_analysis = None
-    person_image_bytes = None
     try:
         result = await db.execute(
             select(BodyProfile)
@@ -302,17 +311,8 @@ async def finalize_outfit(
         profile = result.scalar_one_or_none()
         if profile and profile.measurements:
             body_profile = profile.measurements
-            front_b64 = body_profile.get('_front_photo_b64')
-            if front_b64:
-                try:
-                    person_image_bytes = base64.b64decode(front_b64)
-                except Exception:
-                    pass
     except Exception:
         pass
-        
-    if not person_image_bytes:
-        raise HTTPException(status_code=400, detail="Please upload your photo again.")
 
     # Phase D: Generate outfit image — capture bytes for inline delivery
     image_url = None
@@ -425,6 +425,16 @@ async def finalize_outfit(
     try:
         from services.vision.virtual_tryon import generate_tryon_image
 
+        # Extract user's front photo from BodyProfile (stored by avatar.py)
+        person_image_bytes = None
+        if body_profile and isinstance(body_profile, dict):
+            front_b64 = body_profile.get('_front_photo_b64')
+            if front_b64:
+                try:
+                    person_image_bytes = base64.b64decode(front_b64)
+                except Exception:
+                    pass
+
         garment_image_bytes = base64.b64decode(outfit_image_b64) if outfit_image_b64 else None
 
         tryon_bytes, tryon_engine = await generate_tryon_image(
@@ -437,11 +447,9 @@ async def finalize_outfit(
             tryon_image_b64 = base64.b64encode(tryon_bytes).decode('ascii')
             logger.info('[finalize] Try-on image generated via %s (%d bytes)',
                         tryon_engine, len(tryon_bytes))
-            # Set outfit_image_b64 to None to ensure ONLY try-on is returned
-            outfit_image_b64 = None
+            # DO NOT clear outfit_image_b64 here so it can be uploaded
     except Exception as exc:
-        logger.error('Virtual try-on failed: %s', exc)
-        raise HTTPException(status_code=503, detail="Virtual Try-On service is temporarily unavailable.")
+        logger.warning('Virtual try-on failed (non-blocking): %s', exc)
 
     # Phase H: Upload to storage and save to wardrobe
     wardrobe_item_id = None

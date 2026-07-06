@@ -18,6 +18,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
+  String _selectedGender = 'female'; // Default selection
   bool _isSignup = false;
   bool _loading = false;
   String? _error;
@@ -79,6 +80,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       email: email,
       password: password,
       displayName: name.isNotEmpty ? name : null,
+      gender: _selectedGender,
     );
 
     if (errorMsg == null) {
@@ -256,6 +258,37 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     ),
                   ),
                 ],
+                const SizedBox(height: 12),
+                // Gender Dropdown
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                    ),
+                    color: Colors.white.withValues(alpha: 0.05),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedGender,
+                      isExpanded: true,
+                      dropdownColor: const Color(0xFF1A1A24),
+                      icon: Icon(Icons.arrow_drop_down, color: Colors.white.withValues(alpha: 0.4)),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      items: const [
+                        DropdownMenuItem(value: 'male', child: Text('Male')),
+                        DropdownMenuItem(value: 'female', child: Text('Female')),
+                        DropdownMenuItem(value: 'other', child: Text('Other')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => _selectedGender = value);
+                        }
+                      },
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 // Error message
                 if (_error != null)

@@ -28,6 +28,7 @@ const _kAccessToken = 'aura_access_token';
 const _kRefreshToken = 'aura_refresh_token';
 const _kUserId = 'aura_user_id';
 const _kDisplayName = 'aura_display_name';
+const _kGender = 'aura_user_gender';
 
 /// Attempts to restore a cached session or create a new one.
 /// Returns true if authenticated successfully.
@@ -41,11 +42,13 @@ final initApiProvider = FutureProvider<bool>((ref) async {
   final prefs = await SharedPreferences.getInstance();
   final cachedToken = prefs.getString(_kAccessToken);
   final cachedUserId = prefs.getString(_kUserId);
+  final cachedGender = prefs.getString(_kGender);
 
   // Try cached token first
   if (cachedToken != null && cachedToken.isNotEmpty) {
     client.setToken(cachedToken);
     client.userId = cachedUserId;
+    client.gender = cachedGender;
     try {
       // Validate token
       await client.healthCheck();
@@ -82,6 +85,7 @@ Future<String?> performAuth(
   required String email,
   required String password,
   String? displayName,
+  String? gender,
 }) async {
   try {
     Map<String, dynamic> data;
@@ -107,10 +111,12 @@ Future<String?> performAuth(
     if (refreshToken != null) await prefs.setString(_kRefreshToken, refreshToken);
     await prefs.setString(_kUserId, userId);
     if (displayName != null) await prefs.setString(_kDisplayName, displayName);
+    if (gender != null) await prefs.setString(_kGender, gender);
 
     connState.state = AppConnectionState.online;
     authState.state = true;
     userIdState.state = userId;
+    client.gender = gender;
     return null; // success
   } on DioException catch (e) {
     connState.state = AppConnectionState.offline;

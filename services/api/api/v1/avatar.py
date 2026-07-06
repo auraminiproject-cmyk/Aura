@@ -84,7 +84,7 @@ async def analyze_body(
     front: UploadFile = File(...),
     side: UploadFile | None = File(None),
     height_cm: float = Form(165.0),
-    gender_override: str | None = Form(None),
+    gender: str | None = Form(None),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -128,16 +128,6 @@ async def analyze_body(
     # Run analysis
     result = await reconstruct_body(front_bytes, side_bytes, height_cm=height_cm)
 
-    # Validate gender confidence (per user request)
-    vlm_gender = result.measurements.get("_vlm_gender", "neutral")
-    gender_conf = result.measurements.get("_vlm_gender_confidence", 1.0)
-    
-    if gender_override:
-        result.measurements["_vlm_gender"] = gender_override
-        result.measurements["_vlm_gender_confidence"] = 1.0
-    elif gender_conf < 0.60 or vlm_gender == "neutral":
-        raise HTTPException(status_code=400, detail="Please select your gender for better outfit generation.")
-
     # Log confidence level — never hard-reject.
     # All pipelines produce usable measurements for fashion design.
     # Confidence is returned to the mobile app as informational only.
@@ -164,6 +154,10 @@ async def analyze_body(
     # Clean measurements for storage (remove _vlm_ metadata keys for DB)
     clean_measurements = {k: v for k, v in result.measurements.items() if not k.startswith("_")}
     meta = {k: v for k, v in result.measurements.items() if k.startswith("_")}
+
+    # Override VLM gender with explicitly selected gender if provided
+    if gender:
+        meta["_vlm_gender"] = gender
 
     # Store compressed front photo for virtual try-on reuse
     # Compress to ~50KB JPEG to keep DB payload reasonable
