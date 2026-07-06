@@ -97,8 +97,28 @@ async def node_outfit_gen(state: AgenticState) -> AgenticState:
     if state.get("plan_goal") not in ("PROPOSE_OUTFIT", "FINALIZE"):
         return state
         
+    params_data = state.get("design_params") or {}
+    garments = params_data.get("garment_types", [])
+    colors = params_data.get("colors", [])
+    
+    garment = garments[0] if garments else ""
+    color = colors[0] if colors else ""
+    gender = state.get("profile_data", {}).get("gender", "neutral")
+    
+    brief_parts = [gender]
+    if color: brief_parts.append(color)
+    if garment: brief_parts.append(garment)
+    else: brief_parts.append("outfit")
+    
+    occasion = params_data.get("occasion")
+    if occasion: brief_parts.append(f"for {occasion}")
+    
+    design_brief = " ".join(brief_parts)
+    if design_brief == f"{gender} outfit":
+        design_brief = f"{gender} outfit: {state['message']}"
+        
     try:
-        outfit_result = await generate_outfits(design_brief=state["message"], num_variants=1)
+        outfit_result = await generate_outfits(design_brief=design_brief, num_variants=1)
         variants = [v.__dict__ for v in outfit_result.variants]
         return {**state, "outfits": variants}
     except Exception as e:
@@ -168,11 +188,16 @@ async def node_finalize(state: AgenticState) -> AgenticState:
     products = []
     try:
         from services.retrieval.web_search import search_products
-        # Convert design_params to spec expected by web_search
         garments = params_data.get("garment_types", [])
         colors = params_data.get("colors", [])
+        gender = state.get("profile_data", {}).get("gender", "")
+        
+        garment = garments[0] if garments else "outfit"
+        if gender and gender.lower() != "neutral":
+            garment = f"{gender} {garment}"
+            
         spec = {
-            "garment_type": garments[0] if garments else "outfit",
+            "garment_type": garment,
             "color": colors[0] if colors else "",
             "occasion": params_data.get("occasion"),
             "budget_inr": params_data.get("budget_inr")
