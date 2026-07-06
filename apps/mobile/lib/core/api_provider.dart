@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_client.dart';
 import 'config.dart';
+import 'package:dio/dio.dart';
 
 /// Tracks whether we are online (authenticated with backend) or offline.
 final connectionStateProvider = StateProvider<AppConnectionState>(
@@ -71,7 +72,7 @@ final initApiProvider = FutureProvider<bool>((ref) async {
 });
 
 /// Perform auth (login/signup), cache tokens, and update state.
-Future<bool> performAuth(
+Future<String?> performAuth(
   ApiClient client,
   SharedPreferences prefs,
   StateController<AppConnectionState> connState,
@@ -110,10 +111,18 @@ Future<bool> performAuth(
     connState.state = AppConnectionState.online;
     authState.state = true;
     userIdState.state = userId;
-    return true;
+    return null; // success
+  } on DioException catch (e) {
+    connState.state = AppConnectionState.offline;
+    if (e.response != null && e.response!.data is Map && e.response!.data['detail'] != null) {
+      final detail = e.response!.data['detail'];
+      if (detail is String) return detail;
+      if (detail is List && detail.isNotEmpty) return detail[0]['msg']?.toString() ?? 'Validation error';
+    }
+    return 'Authentication failed. Please check credentials or internet.';
   } catch (_) {
     connState.state = AppConnectionState.offline;
-    return false;
+    return 'An unexpected error occurred.';
   }
 }
 

@@ -69,7 +69,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
     final name = _nameController.text.trim();
 
-    final success = await performAuth(
+    final errorMsg = await performAuth(
       client,
       prefs,
       connState,
@@ -81,12 +81,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       displayName: name.isNotEmpty ? name : null,
     );
 
-    if (success) {
+    if (errorMsg == null) {
       widget.onAuthenticated();
     } else {
       setState(() {
         _loading = false;
-        _error = 'Authentication failed. Please check credentials or internet.';
+        _error = errorMsg;
       });
     }
   }
