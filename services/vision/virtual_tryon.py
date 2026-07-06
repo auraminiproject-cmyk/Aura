@@ -212,21 +212,24 @@ async def _sdxl_body_illustration(
     # Build body-aware prompt
     body_desc = ""
     if body_analysis:
+        gender = body_analysis.get("gender", "neutral").lower()
+        subject = "man" if gender == "masculine" else "woman" if gender == "feminine" else "person"
+        
         body_type = body_analysis.get("body_type", "")
         height_cat = body_analysis.get("height_category", "average")
         body_type_prompts = {
-            "hourglass": "woman with defined waist, balanced proportions",
-            "pear": "woman with narrow shoulders and wider hips",
-            "apple": "woman with fuller midsection, balanced shoulders",
-            "rectangle": "woman with athletic straight frame",
-            "inverted_triangle": "woman with broad shoulders and narrow hips",
+            "hourglass": f"{subject} with defined waist, balanced proportions",
+            "pear": f"{subject} with narrow shoulders and wider hips",
+            "apple": f"{subject} with fuller midsection, balanced shoulders",
+            "rectangle": f"{subject} with athletic straight frame",
+            "inverted_triangle": f"{subject} with broad shoulders and narrow hips",
         }
         height_prompts = {
-            "petite": "petite",
+            "petite": "petite" if subject == "woman" else "short",
             "tall": "tall",
             "average": "average height",
         }
-        body_desc = f"{height_prompts.get(height_cat, '')} {body_type_prompts.get(body_type, 'woman')}"
+        body_desc = f"{height_prompts.get(height_cat, '')} {body_type_prompts.get(body_type, subject)}"
 
     garment = spec.get("garment_type", "outfit")
     fabric = spec.get("fabric", "silk")

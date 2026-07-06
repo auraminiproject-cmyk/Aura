@@ -196,12 +196,11 @@ async def analyze_body(
     await db.commit()
     await db.refresh(profile)
 
-    # Clear old chat history for this user's default session
+    # Clear old chat history for this user's default session in memory only
     try:
         sess_id = f"{user_id}-voice-default"
         clear_session(sess_id)
-        await db.execute(delete(Conversation).where(Conversation.session_id == sess_id))
-        await db.commit()
+        # We NO LONGER delete from the DB here, so users retain their chat history!
     except Exception as e:
         logger.warning("Failed to clear chat history: %s", e)
 

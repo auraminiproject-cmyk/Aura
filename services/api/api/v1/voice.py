@@ -41,6 +41,19 @@ async def _ensure_db_session(db: AsyncSession, session_id: str, user_id: str):
         except Exception:
             await db.rollback()
 
+async def _load_history_if_needed(db: AsyncSession, session_id: str):
+    """Load conversation history from DB into memory if memory is empty."""
+    session = get_or_create_session(session_id)
+    if not session.history:
+        from sqlalchemy import select
+        from services.api.core.models import Conversation
+        result = await db.execute(
+            select(Conversation)
+            .where(Conversation.session_id == session_id)
+            .order_by(Conversation.created_at.asc())
+        )
+        for msg in result.scalars().all():
+            session.history.append({"role": msg.role, "content": msg.content})
 
 
 class ConverseResponse(BaseModel):
@@ -105,6 +118,9 @@ async def voice_converse(
             body_profile = profile.measurements
     except Exception:
         pass  # body profile is optional
+
+    # Load DB history into memory if empty
+    await _load_history_if_needed(db, session_id)
 
     # Step 3: Stylist LLM — negotiate outfit (with detected language)
     reply_text, outfit_state = await stylist_respond(
@@ -178,6 +194,9 @@ async def voice_converse_text(
             body_profile = profile.measurements
     except Exception:
         pass
+
+    # Load DB history into memory if empty
+    await _load_history_if_needed(db, session_id)
 
     reply_text, outfit_state = await stylist_respond(
         transcript=body.message,
@@ -299,7 +318,15 @@ async def finalize_outfit(
         _silhouette = spec.get('silhouette', '')
         _occasion = spec.get('occasion', '')
         _style = spec.get('style_notes', '')
-        _parts = [f'{_color} {_fabric} {_garment}',
+        
+        # Inject gender into prompt
+        _gender_str = "neutral"
+        if body_profile:
+            _meta = body_profile.get("_meta", {})
+            _gender_str = _meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
+        _subject = "man" if _gender_str.lower() == "masculine" else "woman" if _gender_str.lower() == "feminine" else "person"
+        
+        _parts = [f'{_subject} wearing {_color} {_fabric} {_garment}',
                   f'{_silhouette} silhouette' if _silhouette else '',
                   f'for {_occasion}' if _occasion else '', _style,
                   'high fashion editorial, studio lighting, full body, 4k']
@@ -347,6 +374,10 @@ async def finalize_outfit(
 
             body_analysis_result = analyze_body(body_profile)
             body_analysis = body_analysis_result.to_dict()
+            
+            # Inject gender for Virtual Try-On
+            meta = body_profile.get("_meta", {})
+            body_analysis["gender"] = meta.get("_vlm_gender", body_profile.get("_vlm_gender", "neutral"))
 
             tailoring = compute_tailoring(
                 garment_type=spec.get("garment_type", "kurta"),
@@ -355,8 +386,8 @@ async def finalize_outfit(
                 body_type=body_analysis_result.body_type,
             )
             tailoring_data = tailoring.to_dict()
-            logger.info("[finalize] Tailoring computed for %s, body_type=%s",
-                        spec.get("garment_type"), body_analysis_result.body_type)
+            logger.info("[finalize] Tailoring computed for %s, body_type=%s, gender=%s",
+                        spec.get("garment_type"), body_analysis_result.body_type, body_analysis["gender"])
         except Exception as exc:
             logger.warning("Tailoring calculation failed: %s", exc)
 
