@@ -9,7 +9,7 @@ import 'core/api_provider.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/home/status_banner.dart';
-import 'features/avatar/avatar_capture_screen.dart';
+import 'features/avatar/profile_screen.dart';
 import 'features/design/design_screen.dart';
 import 'features/products/product_results_screen.dart';
 import 'features/wardrobe/wardrobe_screen.dart';
@@ -109,7 +109,7 @@ class _MainShellState extends State<MainShell> {
 
   static const _tabs = [
     ('Chat', Icons.auto_awesome, Icons.auto_awesome_outlined),
-    ('Avatar', Icons.face_retouching_natural, Icons.face_retouching_natural_outlined),
+    ('Profile', Icons.person, Icons.person_outline),
     ('Design', Icons.brush, Icons.brush_outlined),
     ('Shop', Icons.shopping_bag, Icons.shopping_bag_outlined),
     ('Wardrobe', Icons.checkroom, Icons.checkroom_outlined),
@@ -119,7 +119,7 @@ class _MainShellState extends State<MainShell> {
   Widget build(BuildContext context) {
     final screens = [
       const ChatScreen(),
-      const AvatarCaptureScreen(),
+      const ProfileScreen(),
       const DesignScreen(),
       const ProductResultsScreen(),
       const WardrobeScreen(),

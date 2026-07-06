@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -8,16 +9,17 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api_provider.dart';
 
-class AvatarCaptureScreen extends ConsumerStatefulWidget {
-  const AvatarCaptureScreen({super.key});
+class ProfileScreen extends ConsumerStatefulWidget {
+  const ProfileScreen({super.key});
 
   @override
-  ConsumerState<AvatarCaptureScreen> createState() => _AvatarCaptureScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _picker = ImagePicker();
   final _heightController = TextEditingController(text: '165');
+  bool _isRetaking = false;
 
   // Photo state
   String? _frontPath;
@@ -318,6 +320,10 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_storedMeasurements != null && !_isRetaking) {
+      return _buildDashboard();
+    }
+
     final measurements = _result?['measurements'] as Map<String, dynamic>?;
     final confidence = (_result?['confidence'] as num?)?.toDouble();
     final buildType = _result?['build_type'] as String?;
@@ -328,6 +334,10 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
         backgroundColor: Colors.transparent,
         title: const Text('Body Analysis'),
         centerTitle: true,
+        leading: _storedMeasurements != null ? IconButton(
+          icon: const Icon(Icons.close),
+          onPressed: () => setState(() => _isRetaking = false),
+        ) : null,
         actions: [
           if (_storedMeasurements?['has_profile'] == true)
             IconButton(
@@ -626,6 +636,141 @@ class _AvatarCaptureScreenState extends ConsumerState<AvatarCaptureScreen> {
           ),
           const SizedBox(height: 20),
           _MeasurementGrid(measurements: measurements),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboard() {
+    final measurements = _storedMeasurements!['measurements'] as Map<String, dynamic>?;
+    final b64Photo = measurements?['_front_photo_b64'] as String?;
+    final gender = measurements?['_vlm_gender'] as String? ?? 'Not specified';
+    final buildType = _storedMeasurements!['build_type'] as String? ?? 'Average';
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        title: const Text('My Profile', style: TextStyle(fontWeight: FontWeight.w600)),
+        centerTitle: true,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFD4AF37), width: 3),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFD4AF37).withValues(alpha: 0.2), blurRadius: 20, spreadRadius: 2),
+                ],
+              ),
+              child: ClipOval(
+                child: b64Photo != null
+                    ? Image.memory(base64Decode(b64Photo), fit: BoxFit.cover)
+                    : Container(color: Colors.white10, child: const Icon(Icons.person, size: 60, color: Colors.white54)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.verified, color: Color(0xFFD4AF37), size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Wired to AI Agent\nThis data is actively used to personalize your style recommendations and tailor designs.',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Text('BODY PROFILE', style: TextStyle(color: const Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+          const SizedBox(height: 12),
+          _buildInfoRow('Gender', gender.toUpperCase()),
+          const Divider(color: Colors.white10),
+          _buildInfoRow('Build Type', buildType.toUpperCase()),
+          const Divider(color: Colors.white10),
+          if (measurements != null) ...[
+            const SizedBox(height: 24),
+            const Text('KEY MEASUREMENTS', style: TextStyle(color: const Color(0xFFD4AF37), fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            const SizedBox(height: 12),
+            GridView.count(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.5,
+              children: [
+                _buildMeasurementBox('Chest', measurements['chest_cm']),
+                _buildMeasurementBox('Waist', measurements['waist_cm']),
+                _buildMeasurementBox('Hips', measurements['hip_cm']),
+                _buildMeasurementBox('Inseam', measurements['inseam_cm']),
+              ],
+            ),
+          ],
+          const SizedBox(height: 40),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.camera_alt, color: Colors.white),
+            label: const Text('Update Avatar & Measurements', style: TextStyle(color: Colors.white)),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => setState(() => _isRetaking = true),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 15)),
+          Text(value, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeasurementBox(String label, dynamic value) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text('${value != null ? (value as num).toInt() : "--"}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(width: 4),
+              const Text('cm', style: TextStyle(color: Color(0xFFD4AF37), fontSize: 12)),
+            ],
+          ),
         ],
       ),
     );

@@ -59,6 +59,11 @@ class ApiClient {
     return data;
   }
 
+  Future<Map<String, dynamic>> getMe() async {
+    final resp = await _dio.get('/api/v1/auth/me');
+    return resp.data as Map<String, dynamic>;
+  }
+
   Future<Map<String, dynamic>> sendChat({
     required String message,
     String? sessionId,
