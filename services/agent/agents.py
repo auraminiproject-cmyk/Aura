@@ -62,6 +62,11 @@ class PlannerAgent:
     """Orchestrates the strategic goal based on memory, intent, and user profile."""
     @staticmethod
     def determine_plan(intent: str, context: dict[str, Any], message: str) -> str:
+        msg_lower = message.lower()
+        finalize_keywords = ["finalize", "done", "looks good", "generate", "image", "url", "link", "buy", "purchase", "show"]
+        if any(keyword in msg_lower for keyword in finalize_keywords):
+            return "FINALIZE"
+            
         # Check if we need to resolve measurements (profile missing or user asked for another person)
         if intent == "design_request":
             if not context.get("profile_resolved", False):
@@ -69,11 +74,8 @@ class PlannerAgent:
             if not context.get("design_params_complete", False):
                 return "GATHER_REQUIREMENTS"
             return "PROPOSE_OUTFIT"
+            
         if intent in ("product_search", "tailoring", "wardrobe"):
-            return "FINALIZE"
-        
-        # If user explicitly asks to finalize or we reached a natural end
-        if "finalize" in message.lower() or "done" in message.lower() or "looks good" in message.lower():
             return "FINALIZE"
             
         return "GENERAL_CHAT"
