@@ -64,6 +64,15 @@ async def init_db() -> None:
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                
+                # Manual migration for gender column
+                from sqlalchemy import text
+                from sqlalchemy.exc import OperationalError, ProgrammingError
+                try:
+                    await conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(16)"))
+                except (OperationalError, ProgrammingError):
+                    pass
+                
             logger.info("Database initialised successfully (attempt %d).", attempt)
             return
         except Exception as exc:
@@ -96,6 +105,15 @@ async def init_db() -> None:
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                
+                # Manual migration for gender column
+                from sqlalchemy import text
+                from sqlalchemy.exc import OperationalError, ProgrammingError
+                try:
+                    await conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(16)"))
+                except (OperationalError, ProgrammingError):
+                    pass
+                
             logger.info("SQLite fallback initialised successfully.")
             return
         except Exception as fallback_exc:
