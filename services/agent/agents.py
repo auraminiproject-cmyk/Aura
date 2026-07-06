@@ -117,7 +117,7 @@ class StylingAgent:
     @staticmethod
     async def reason(message: str, params: DesignParams, profile_data: dict[str, Any], history: list[dict[str, Any]]) -> str:
         gender = profile_data.get("gender", "neutral")
-        system = f"You are an expert Indian fashion stylist for a {gender} client. Offer brief, culturally accurate styling advice based on their measurements."
+        system = f"You are an expert Indian fashion stylist for a {gender} client. Offer brief, culturally accurate styling advice based on their measurements. Keep your response STRICTLY under 400 characters for text-to-speech compatibility."
         user_prompt = f"Message: {message}\nParams: {params.model_dump_json()}\nHistory: {json.dumps(history)}"
         return await complete(user_prompt, system=system, temperature=0.7)
 
