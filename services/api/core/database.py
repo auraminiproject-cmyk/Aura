@@ -65,13 +65,26 @@ async def init_db() -> None:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
                 
-                # Manual migration for gender column
+                # Manual migrations
                 from sqlalchemy import text
                 from sqlalchemy.exc import OperationalError, ProgrammingError
-                try:
-                    await conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(16)"))
-                except (OperationalError, ProgrammingError):
-                    pass
+                
+                migrations = [
+                    "ALTER TABLE users ADD COLUMN gender VARCHAR(16)",
+                    "ALTER TABLE body_profiles ADD COLUMN profile_type VARCHAR(32) DEFAULT 'primary'",
+                    "ALTER TABLE body_profiles ADD COLUMN profile_name VARCHAR(128)",
+                    "ALTER TABLE body_profiles ADD COLUMN gender VARCHAR(16)",
+                    "ALTER TABLE sessions ADD COLUMN status VARCHAR(32) DEFAULT 'active'",
+                    "ALTER TABLE sessions ADD COLUMN context_json JSON",
+                    "ALTER TABLE conversations ADD COLUMN language VARCHAR(8)",
+                    "ALTER TABLE conversations ADD COLUMN metadata_json JSON",
+                ]
+                
+                for migration in migrations:
+                    try:
+                        await conn.execute(text(migration))
+                    except (OperationalError, ProgrammingError):
+                        pass
                 
             logger.info("Database initialised successfully (attempt %d).", attempt)
             return
@@ -106,13 +119,26 @@ async def init_db() -> None:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
                 
-                # Manual migration for gender column
+                # Manual migrations
                 from sqlalchemy import text
                 from sqlalchemy.exc import OperationalError, ProgrammingError
-                try:
-                    await conn.execute(text("ALTER TABLE users ADD COLUMN gender VARCHAR(16)"))
-                except (OperationalError, ProgrammingError):
-                    pass
+                
+                migrations = [
+                    "ALTER TABLE users ADD COLUMN gender VARCHAR(16)",
+                    "ALTER TABLE body_profiles ADD COLUMN profile_type VARCHAR(32) DEFAULT 'primary'",
+                    "ALTER TABLE body_profiles ADD COLUMN profile_name VARCHAR(128)",
+                    "ALTER TABLE body_profiles ADD COLUMN gender VARCHAR(16)",
+                    "ALTER TABLE sessions ADD COLUMN status VARCHAR(32) DEFAULT 'active'",
+                    "ALTER TABLE sessions ADD COLUMN context_json JSON",
+                    "ALTER TABLE conversations ADD COLUMN language VARCHAR(8)",
+                    "ALTER TABLE conversations ADD COLUMN metadata_json JSON",
+                ]
+                
+                for migration in migrations:
+                    try:
+                        await conn.execute(text(migration))
+                    except (OperationalError, ProgrammingError):
+                        pass
                 
             logger.info("SQLite fallback initialised successfully.")
             return
