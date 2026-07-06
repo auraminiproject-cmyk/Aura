@@ -147,6 +147,7 @@ async def voice_converse(
 
     # Note: run_graph already saves the conversation internally via node_memory_save,
     # but we also explicitly add it to the Conversation table for the frontend history.
+    await _ensure_db_session(db, session_id, user_id)
     try:
         db.add(Conversation(session_id=session_id, role="user", content=transcript, language=detected_lang))
         db.add(Conversation(session_id=session_id, role="assistant", content=reply_text, language=detected_lang))
@@ -238,6 +239,7 @@ async def voice_converse_text(
     }
 
     # Save conversation
+    await _ensure_db_session(db, session_id, user_id)
     try:
         db.add(Conversation(session_id=session_id, role="user", content=body.message, language=body.language))
         db.add(Conversation(session_id=session_id, role="assistant", content=reply_text, language=body.language))
