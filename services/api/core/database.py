@@ -82,7 +82,8 @@ async def init_db() -> None:
                 
                 for migration in migrations:
                     try:
-                        await conn.execute(text(migration))
+                        async with conn.begin_nested():
+                            await conn.execute(text(migration))
                     except (OperationalError, ProgrammingError):
                         pass
                 
@@ -136,7 +137,8 @@ async def init_db() -> None:
                 
                 for migration in migrations:
                     try:
-                        await conn.execute(text(migration))
+                        async with conn.begin_nested():
+                            await conn.execute(text(migration))
                     except (OperationalError, ProgrammingError):
                         pass
                 

@@ -40,7 +40,11 @@ def ensure_collection(client: QdrantClient) -> None:
 
 def upsert_product(client: QdrantClient, *, vector: list[float], payload: dict[str, Any]) -> str:
     ensure_collection(client)
-    point_id = payload.get("id") or str(uuid.uuid4())
+    raw_id = payload.get("id")
+    if raw_id:
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(raw_id)))
+    else:
+        point_id = str(uuid.uuid4())
     client.upsert(
         collection_name=COLLECTION,
         points=[qmodels.PointStruct(id=point_id, vector=vector, payload=payload)],
