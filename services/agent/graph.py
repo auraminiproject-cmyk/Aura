@@ -143,14 +143,27 @@ async def node_tryon(state: AgenticState) -> AgenticState:
         logging.getLogger(__name__).warning("Avatar missing. Skipping try-on.")
         return state
         
+    if avatar_b64 and avatar_b64.startswith("data:image"):
+        avatar_b64 = avatar_b64.split(",")[1]
+    image_b64 = state.get("image_b64")
+    if image_b64 and image_b64.startswith("data:image"):
+        image_b64 = image_b64.split(",")[1]
+        
     person_bytes = None
-    if state.get("image_b64"):
-        person_bytes = base64.b64decode(state["image_b64"])
+    if image_b64:
+        target_b64 = image_b64
     elif avatar_b64:
-        person_bytes = base64.b64decode(avatar_b64)
+        target_b64 = avatar_b64
     else:
         import logging
         logging.getLogger(__name__).warning("Avatar missing. Skipping try-on.")
+        return state
+        
+    try:
+        person_bytes = base64.b64decode(target_b64)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Avatar decode failed: {e}")
         return state
         
     garment_b64 = outfits[0].get("image_url") or outfits[0].get("image_base64")
