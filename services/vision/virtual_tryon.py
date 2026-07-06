@@ -35,8 +35,9 @@ _TRYON_SPACES = [
 async def try_on_with_spaces(
     person_image_bytes: bytes,
     garment_image_bytes: bytes,
+    prompt: str = "Fashion garment",
 ) -> bytes | None:
-    """Call a HuggingFace Space for virtual try-on concurrently.
+    """Call a HuggingFace Space for virtual try-on concurrently with retries.
 
     Submits requests to multiple free Spaces simultaneously.
     Returns the first successful result and cancels the rest.
@@ -68,7 +69,7 @@ async def try_on_with_spaces(
                     result = client.predict(
                         {"background": handle_file(person_path), "layers": [], "composite": None},
                         handle_file(garment_path),
-                        "Fashion garment",
+                        prompt,
                         True,
                         False,
                         30,
@@ -81,7 +82,7 @@ async def try_on_with_spaces(
                     result = client.predict(
                         handle_file(person_path),
                         handle_file(garment_path),
-                        "Fashion garment",
+                        prompt,
                         True,
                         False,
                         30,
@@ -124,37 +125,38 @@ async def try_on_with_spaces(
                 raise RuntimeError(f"Space {space_id} failed or returned None")
             return res
 
-        try:
-            tasks = [asyncio.create_task(_run_async(sid)) for sid in _TRYON_SPACES]
-            pending = set(tasks)
-            start_time = time.time()
-            while pending:
-                elapsed = time.time() - start_time
-                if elapsed >= 90.0:
-                    break
-                    
-                done, pending = await asyncio.wait(
-                    pending,
-                    timeout=90.0 - elapsed,
-                    return_when=asyncio.FIRST_COMPLETED
-                )
-                
-                if not done:
-                    break # timeout
-                    
-                for task in done:
-                    try:
-                        res = task.result()
-                        if res:
-                            return res
-                    except Exception as exc:
-                        logger.debug("[tryon] A task failed: %s", exc)
+        for attempt in range(2):
+            try:
+                tasks = [asyncio.create_task(_run_async(sid)) for sid in _TRYON_SPACES]
+                pending = set(tasks)
+                start_time = time.time()
+                while pending:
+                    elapsed = time.time() - start_time
+                    if elapsed >= 90.0:
+                        break
                         
-            logger.warning("All Try-On Spaces failed or timed out.")
-            return None
-        finally:
-            pass
-
+                    done, pending = await asyncio.wait(
+                        pending,
+                        timeout=90.0 - elapsed,
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    
+                    if not done:
+                        break # timeout
+                        
+                    for task in done:
+                        try:
+                            res = task.result()
+                            if res:
+                                return res
+                        except Exception as exc:
+                            logger.debug("[tryon] A task failed: %s", exc)
+                            
+                logger.warning("Attempt %d: All Try-On Spaces failed or timed out.", attempt + 1)
+            except Exception as e:
+                logger.warning("Attempt %d: Retry loop error: %s", attempt + 1, e)
+        
+        return None
     except ImportError:
         logger.warning("gradio_client not installed — pip install gradio_client")
         return None
@@ -173,103 +175,37 @@ async def generate_tryon_image(
     """Generate a virtual try-on image.
 
     Strategy:
-    1. If we have both person image + garment image → use HF Space for real compositing
-    2. Otherwise → generate body-type-aware SDXL illustration
+    Strictly use HF Space for real compositing if both images are present.
+    NEVER fall back to SDXL (random models).
 
     Returns:
         Tuple of (image_bytes, engine_used).
     """
-    # Strategy 1: Real virtual try-on if we have both images
-    if person_image_bytes and garment_image_bytes:
-        logger.info("[tryon] Attempting real virtual try-on with HF Spaces")
-        result = await try_on_with_spaces(person_image_bytes, garment_image_bytes)
-        if result and len(result) > 500:
-            logger.info("[tryon] Real virtual try-on succeeded (%d bytes)", len(result))
-            return result, "hf-space-vton"
-
-    # Strategy 2: Body-type-aware SDXL illustration
-    logger.info("[tryon] Generating body-type-aware SDXL illustration")
-    result = await _sdxl_body_illustration(spec, body_analysis)
-    if result and len(result) > 500:
-        return result, "sdxl-body-illustration"
-
-    return None, "none"
-
-
-async def _sdxl_body_illustration(
-    spec: dict[str, Any],
-    body_analysis: dict[str, Any] | None = None,
-) -> bytes | None:
-    """Generate body-type-aware fashion illustration via HF SDXL.
-
-    This isn't a true composite — it's a high-quality fashion illustration
-    that reflects the user's body type and the designed outfit.
-    """
-    settings = get_settings()
-    if not settings.huggingface_api_key:
-        return None
-
-    # Build body-aware prompt
-    body_desc = ""
-    if body_analysis:
-        gender = body_analysis.get("gender", "neutral").lower()
-        subject = "man" if gender == "masculine" else "woman" if gender == "feminine" else "person"
+    if not person_image_bytes:
+        raise ValueError("avatar_missing")
         
-        body_type = body_analysis.get("body_type", "")
-        height_cat = body_analysis.get("height_category", "average")
-        body_type_prompts = {
-            "hourglass": f"{subject} with defined waist, balanced proportions",
-            "pear": f"{subject} with narrow shoulders and wider hips",
-            "apple": f"{subject} with fuller midsection, balanced shoulders",
-            "rectangle": f"{subject} with athletic straight frame",
-            "inverted_triangle": f"{subject} with broad shoulders and narrow hips",
-        }
-        height_prompts = {
-            "petite": "petite" if subject == "woman" else "short",
-            "tall": "tall",
-            "average": "average height",
-        }
-        body_desc = f"{height_prompts.get(height_cat, '')} {body_type_prompts.get(body_type, subject)}"
+    if not garment_image_bytes:
+        raise ValueError("garment_missing")
 
-    garment = spec.get("garment_type", "outfit")
-    fabric = spec.get("fabric", "silk")
-    color = spec.get("color", "red")
-    silhouette = spec.get("silhouette", "")
-    style_notes = spec.get("style_notes", "")
+    # Construct the strict prompt as per user requirements
+    _garment = spec.get("garment_type", "outfit")
+    _fabric = spec.get("fabric", "")
+    _color = spec.get("color", "")
+    outfit_desc = f"{_color} {_fabric} {_garment}".strip()
+    
+    strict_prompt = (
+        f"Use the uploaded person as the identity reference. Keep the person's face, "
+        f"hairstyle, skin tone, body shape, proportions, expression and pose unchanged. "
+        f"Replace only the clothing with: {outfit_desc}. Generate a realistic, high-quality "
+        f"virtual try-on. Preserve lighting and image realism."
+    )
 
-    prompt_parts = [
-        f"Fashion editorial photo of {body_desc}" if body_desc else "Fashion editorial photo",
-        f"wearing {color} {fabric} {garment}",
-        f"{silhouette} silhouette" if silhouette else "",
-        style_notes,
-        "Indian fashion, studio lighting, full body shot",
-        "detailed fabric texture, professional fashion photography, 4k quality",
-        "realistic body proportions, natural pose",
-    ]
-    prompt = ", ".join(p for p in prompt_parts if p)
+    logger.info("[tryon] Attempting real virtual try-on with HF Spaces")
+    result = await try_on_with_spaces(person_image_bytes, garment_image_bytes, prompt=strict_prompt)
+    if result and len(result) > 500:
+        logger.info("[tryon] Real virtual try-on succeeded (%d bytes)", len(result))
+        return result, "hf-space-vton"
 
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            resp = await client.post(
-                "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0",
-                headers={"Authorization": f"Bearer {settings.huggingface_api_key}"},
-                json={
-                    "inputs": prompt,
-                    "parameters": {
-                        "num_inference_steps": 30,
-                        "guidance_scale": 7.5,
-                        "width": 512,
-                        "height": 768,
-                    },
-                },
-            )
-            if resp.status_code == 200 and len(resp.content) > 500:
-                hf_breaker.success()
-                return resp.content
-            if resp.status_code in (503, 429):
-                hf_breaker.fail()
-            logger.warning("SDXL illustration returned %d", resp.status_code)
-    except Exception as exc:
-        logger.warning("SDXL illustration failed: %s", exc)
+    # Virtual try-on failed after retries. Throw error to enforce failure instead of fallback.
+    raise RuntimeError("vton_failed")
 
-    return None

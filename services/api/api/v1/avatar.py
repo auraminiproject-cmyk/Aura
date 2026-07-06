@@ -84,6 +84,7 @@ async def analyze_body(
     front: UploadFile = File(...),
     side: UploadFile | None = File(None),
     height_cm: float = Form(165.0),
+    gender_override: str | None = Form(None),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -126,6 +127,16 @@ async def analyze_body(
 
     # Run analysis
     result = await reconstruct_body(front_bytes, side_bytes, height_cm=height_cm)
+
+    # Validate gender confidence (per user request)
+    vlm_gender = result.measurements.get("_vlm_gender", "neutral")
+    gender_conf = result.measurements.get("_vlm_gender_confidence", 1.0)
+    
+    if gender_override:
+        result.measurements["_vlm_gender"] = gender_override
+        result.measurements["_vlm_gender_confidence"] = 1.0
+    elif gender_conf < 0.60 or vlm_gender == "neutral":
+        raise HTTPException(status_code=400, detail="Please select your gender for better outfit generation.")
 
     # Log confidence level — never hard-reject.
     # All pipelines produce usable measurements for fashion design.

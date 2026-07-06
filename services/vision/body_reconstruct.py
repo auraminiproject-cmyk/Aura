@@ -486,6 +486,7 @@ Respond with ONLY this JSON:
 {{
   "build_type": "<slim|average|athletic|broad|plus|hourglass|pear>",
   "gender_presentation": "<masculine|feminine|neutral>",
+  "gender_confidence": <float_between_0.0_and_1.0>,
   "body_fat_estimate": "<low|moderate|high>",
   "posture": "<upright|slightly_slouched|cannot_tell>",
   "shoulder_vs_hip": "<shoulders_wider|equal|hips_wider>",
@@ -709,6 +710,7 @@ async def reconstruct_body(
     measurements["_vlm_build_type"] = build_type
     if vlm_data:
         measurements["_vlm_gender"] = vlm_data.get("gender_presentation", "neutral")
+        measurements["_vlm_gender_confidence"] = float(vlm_data.get("gender_confidence", 1.0))
         measurements["_vlm_body_fat"] = vlm_data.get("body_fat_estimate", "moderate")
         measurements["_vlm_posture"] = vlm_data.get("posture", "upright")
     measurements["_pipeline"] = pipeline_used
