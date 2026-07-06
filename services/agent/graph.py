@@ -119,7 +119,9 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     avatar_b64 = measurements.get("_front_photo_b64")
     
     if not avatar_url and not state.get("image_b64") and not avatar_b64:
-        return {**state, "error": "Avatar missing. Please upload a full-body photo for try-on."}
+        import logging
+        logging.getLogger(__name__).warning("Avatar missing. Skipping try-on.")
+        return state
         
     person_bytes = None
     if state.get("image_b64"):
@@ -127,13 +129,15 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     elif avatar_b64:
         person_bytes = base64.b64decode(avatar_b64)
     else:
-        # In a real app we'd fetch the avatar_url bytes here.
-        # For this prototype we will assume image_b64 is provided or fail.
-        return {**state, "error": "Avatar missing. Please upload a full-body photo for try-on."}
+        import logging
+        logging.getLogger(__name__).warning("Avatar missing. Skipping try-on.")
+        return state
         
     garment_b64 = outfits[0].get("image_url") or outfits[0].get("image_base64")
     if not garment_b64:
-        return {**state, "error": "Try-On Failed: Garment image missing."}
+        import logging
+        logging.getLogger(__name__).warning("Garment image missing. Skipping try-on.")
+        return state
         
     if garment_b64 and garment_b64.startswith("data:image"):
         garment_b64 = garment_b64.split(",")[1]
@@ -141,13 +145,17 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     garment_bytes = base64.b64decode(garment_b64) if garment_b64 else None
     
     if not garment_bytes:
-        return {**state, "error": "Try-On Failed: Invalid garment image data."}
+        import logging
+        logging.getLogger(__name__).warning("Invalid garment image data. Skipping try-on.")
+        return state
         
     try:
         composite = await TryOnAgent.apply_garment(person_bytes, garment_bytes)
         return {**state, "composite_image_b64": base64.b64encode(composite).decode("ascii")}
     except Exception as e:
-        return {**state, "error": f"Try-On Failed: {e}"}
+        import logging
+        logging.getLogger(__name__).warning(f"Try-On Failed (non-blocking): {e}")
+        return state
 
 async def node_finalize(state: AgenticState) -> AgenticState:
     if state.get("error"): return state
