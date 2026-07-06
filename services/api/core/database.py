@@ -29,6 +29,11 @@ elif _db_url.startswith("postgresql://"):
 elif _db_url.startswith("postgresql+psycopg2://"):
     _db_url = _db_url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
 
+# asyncpg doesn't support query parameters like sslmode=require or channel_binding=require.
+# The easiest fix is to strip the query string entirely. Neon requires SSL, and asyncpg will negotiate it.
+if "?" in _db_url:
+    _db_url = _db_url.split("?")[0]
+
 engine = create_async_engine(_db_url, echo=settings.app_env == "development")
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
