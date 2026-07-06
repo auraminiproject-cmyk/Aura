@@ -46,39 +46,76 @@ async def try_on_with_spaces(
         import tempfile
         import os
 
-        # Write images to temp files (Gradio client needs file paths)
-        f_person = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-        f_person.write(person_image_bytes)
-        f_person.close()
-        person_path = f_person.name
-
-        f_garment = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-        f_garment.write(garment_image_bytes)
-        f_garment.close()
-        garment_path = f_garment.name
-
         loop = asyncio.get_event_loop()
 
         def _call_single_space(space_id: str) -> bytes | None:
+            person_path = None
+            garment_path = None
             try:
+                f_person = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                f_person.write(person_image_bytes)
+                f_person.close()
+                person_path = f_person.name
+
+                f_garment = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                f_garment.write(garment_image_bytes)
+                f_garment.close()
+                garment_path = f_garment.name
+                
                 client = Client(space_id)
-                result = client.predict(
-                    handle_file(person_path),
-                    handle_file(garment_path),
-                    api_name="/tryon",
-                )
-                if isinstance(result, str) and os.path.exists(result):
-                    with open(result, "rb") as f:
+                # First try Gradio 4.x ImageEditor API signature (used by yisol/IDM-VTON recently)
+                try:
+                    result = client.predict(
+                        {"background": handle_file(person_path), "layers": [], "composite": None},
+                        handle_file(garment_path),
+                        "Fashion garment",
+                        True,
+                        False,
+                        30,
+                        42,
+                        api_name="/tryon",
+                    )
+                except Exception as e_new:
+                    # Fallback to older Gradio 3.x Image API signature
+                    logger.debug("[tryon] Space %s failed Gradio 4 API, trying Gradio 3: %s", space_id, e_new)
+                    result = client.predict(
+                        handle_file(person_path),
+                        handle_file(garment_path),
+                        "Fashion garment",
+                        True,
+                        False,
+                        30,
+                        42,
+                        api_name="/tryon",
+                    )
+                
+                # Result is typically a tuple where first element is output image path
+                if isinstance(result, tuple) and len(result) > 0:
+                    out_path = result[0]
+                elif isinstance(result, str):
+                    out_path = result
+                else:
+                    logger.error("[tryon] Space %s returned unexpected type: %s", space_id, type(result))
+                    return None
+                    
+                if out_path and os.path.exists(out_path):
+                    with open(out_path, "rb") as f:
                         return f.read()
-                if isinstance(result, (list, tuple)):
-                    for item in result:
-                        if isinstance(item, str) and os.path.exists(item):
-                            with open(item, "rb") as f:
-                                return f.read()
-                logger.info("Space %s returned unexpected type: %s", space_id, type(result))
-            except Exception as exc:
-                logger.debug("Space %s failed: %s", space_id, exc)
-            return None
+                return None
+            except Exception as e:
+                logger.error("[tryon] Space %s failed: %s", space_id, e)
+                return None
+            finally:
+                if person_path:
+                    try:
+                        os.unlink(person_path)
+                    except OSError:
+                        pass
+                if garment_path:
+                    try:
+                        os.unlink(garment_path)
+                    except OSError:
+                        pass
 
         async def _run_async(space_id: str):
             # Run the blocking Gradio client call in an executor thread
@@ -88,38 +125,35 @@ async def try_on_with_spaces(
             return res
 
         try:
-            tasks = [_run_async(sid) for sid in _TRYON_SPACES]
-            # Use FIRST_COMPLETED to return immediately when one succeeds
-            done, pending = await asyncio.wait(
-                tasks,
-                timeout=90.0,
-                return_when=asyncio.FIRST_COMPLETED
-            )
-            
-            # Cancel all pending tasks so they don't leak
-            for p in pending:
-                p.cancel()
-
-            # Find the first successful result
-            for task in done:
-                try:
-                    result = task.result()
-                    if result:
-                        return result
-                except Exception:
-                    pass
+            tasks = [asyncio.create_task(_run_async(sid)) for sid in _TRYON_SPACES]
+            pending = set(tasks)
+            start_time = time.time()
+            while pending:
+                elapsed = time.time() - start_time
+                if elapsed >= 90.0:
+                    break
                     
+                done, pending = await asyncio.wait(
+                    pending,
+                    timeout=90.0 - elapsed,
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+                
+                if not done:
+                    break # timeout
+                    
+                for task in done:
+                    try:
+                        res = task.result()
+                        if res:
+                            return res
+                    except Exception as exc:
+                        logger.debug("[tryon] A task failed: %s", exc)
+                        
             logger.warning("All Try-On Spaces failed or timed out.")
             return None
         finally:
-            try:
-                os.unlink(person_path)
-            except OSError:
-                pass
-            try:
-                os.unlink(garment_path)
-            except OSError:
-                pass
+            pass
 
     except ImportError:
         logger.warning("gradio_client not installed — pip install gradio_client")
