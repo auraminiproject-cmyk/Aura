@@ -19,6 +19,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _picker = ImagePicker();
   final _heightController = TextEditingController(text: '165');
+  String _selectedGender = 'Neutral';
   bool _isRetaking = false;
 
   // Photo state
@@ -192,6 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         frontPath: _frontPath!,
         sidePath: _sidePath,
         heightCm: heightCm,
+        gender: _selectedGender,
       );
 
       setState(() {
@@ -403,6 +405,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           const SizedBox(height: 16),
           _buildHeightInput(),
+          const SizedBox(height: 12),
+          _buildGenderInput(),
           const SizedBox(height: 16),
 
           // Analyze button
@@ -510,6 +514,60 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.2))),
                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFD4AF37))),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderInput() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFD4AF37).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.person, color: Color(0xFFD4AF37), size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Gender', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                Text('For tailoring context', style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+              ],
+            ),
+          ),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedGender,
+              dropdownColor: const Color(0xFF1A1A2E),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              icon: const Icon(Icons.arrow_drop_down, color: Color(0xFFD4AF37)),
+              items: ['Male', 'Female', 'Neutral'].map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _selectedGender = newValue;
+                  });
+                }
+              },
             ),
           ),
         ],

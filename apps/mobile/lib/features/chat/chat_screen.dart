@@ -9,11 +9,13 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 
 import 'package:dio/dio.dart';
 
 import '../../core/api_provider.dart';
 import '../../core/aura_background.dart';
+import 'chat_history_screen.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({super.key});
@@ -27,7 +29,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _messages = <Map<String, dynamic>>[];
-  final _voiceSessionId = 'voice-default';
+  String _voiceSessionId = const Uuid().v4();
   bool _loading = false;
   String _detectedLang = 'en'; // Auto-updated from responses
   final _audioPlayer = AudioPlayer();
@@ -62,6 +64,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final history = await api.getVoiceHistory(_voiceSessionId);
       if (history.isNotEmpty && mounted) {
         setState(() {
+          _messages.clear();
           for (final msg in history) {
             _messages.add({
               'role': msg['role'],
@@ -381,6 +384,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history, color: Color(0xFFD4AF37)),
+            onPressed: () async {
+              final selectedSessionId = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (ctx) => const ChatHistoryScreen()),
+              );
+              if (selectedSessionId != null && selectedSessionId is String && selectedSessionId != _voiceSessionId) {
+                setState(() {
+                  _voiceSessionId = selectedSessionId;
+                  _messages.clear();
+                });
+                _loadHistory();
+              }
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_comment, color: Color(0xFFD4AF37)),
+            onPressed: () {
+              setState(() {
+                _voiceSessionId = const Uuid().v4();
+                _messages.clear();
+              });
+            },
+          ),
+        ],
       ),
       body: Column(
         children: [

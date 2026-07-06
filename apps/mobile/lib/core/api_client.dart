@@ -127,12 +127,14 @@ class ApiClient {
     required String frontPath,
     String? sidePath,
     double heightCm = 165.0,
+    String gender = 'Neutral',
   }) async {
     final form = FormData.fromMap({
       'front': await MultipartFile.fromFile(frontPath, filename: 'front.jpg'),
       if (sidePath != null)
         'side': await MultipartFile.fromFile(sidePath, filename: 'side.jpg'),
       'height_cm': heightCm.toString(),
+      'gender': gender,
     });
     final resp = await _dio.post('/api/v1/avatar/analyze', data: form);
     return resp.data as Map<String, dynamic>;
@@ -255,5 +257,11 @@ class ApiClient {
       'session_id': sessionId,
     });
     return (resp.data['history'] as List?) ?? [];
+  }
+
+  /// Get list of sessions for current user
+  Future<List<dynamic>> getSessions() async {
+    final resp = await _dio.get('/api/v1/voice/sessions');
+    return (resp.data['sessions'] as List?) ?? [];
   }
 }

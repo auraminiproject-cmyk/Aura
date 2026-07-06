@@ -341,4 +341,44 @@ async def get_voice_history(
         })
         
     return {"history": history}
-
+    
+@router.get("/sessions")
+async def get_voice_sessions(
+    user_id: str = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve all chat sessions for the current user."""
+    # We query the DbSession model
+    result = await db.execute(
+        select(DbSession)
+        .where(DbSession.user_id == user_id)
+        .order_by(DbSession.updated_at.desc())
+    )
+    sessions = result.scalars().all()
+    
+    session_list = []
+    for sess in sessions:
+        # Get the first message to use as a title
+        msg_result = await db.execute(
+            select(Conversation)
+            .where(Conversation.session_id == sess.id)
+            .where(Conversation.role == "user")
+            .order_by(Conversation.created_at.asc())
+            .limit(1)
+        )
+        first_msg = msg_result.scalars().first()
+        title = first_msg.content[:40] + "..." if first_msg else "New Design Session"
+        
+        # Strip user_id from session id for mobile app consumption
+        display_id = sess.id
+        if display_id.startswith(f"{user_id}-"):
+            display_id = display_id[len(user_id)+1:]
+            
+        session_list.append({
+            "id": display_id,
+            "title": title,
+            "status": sess.status,
+            "updated_at": sess.updated_at.isoformat() if sess.updated_at else None
+        })
+        
+    return {"sessions": session_list}

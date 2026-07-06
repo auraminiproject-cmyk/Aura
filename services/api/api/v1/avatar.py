@@ -84,6 +84,7 @@ async def analyze_body(
     front: UploadFile = File(...),
     side: UploadFile | None = File(None),
     height_cm: float = Form(165.0),
+    gender: str = Form("Neutral"),
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ):
@@ -171,6 +172,13 @@ async def analyze_body(
         "_front_photo_b64": front_photo_b64,
     }
 
+    # Update the User record with the new gender as well
+    from services.api.core.models import User
+    user_obj = await db.get(User, user_id)
+    if user_obj:
+        user_obj.gender = gender
+        db.add(user_obj)
+
     # Upsert body profile — replace existing profile for this user
     existing = await db.execute(
         select(BodyProfile)
@@ -183,6 +191,7 @@ async def analyze_body(
         old_profile.smplx_params = result.smplx_params
         old_profile.glb_url = mesh_url
         old_profile.measurements = store_data
+        old_profile.gender = gender
         profile = old_profile
     else:
         profile = BodyProfile(
@@ -190,19 +199,12 @@ async def analyze_body(
             smplx_params=result.smplx_params,
             glb_url=mesh_url,
             measurements=store_data,
+            gender=gender
         )
         db.add(profile)
 
     await db.commit()
     await db.refresh(profile)
-
-    # Clear old chat history for this user's default session in memory only
-    try:
-        sess_id = f"{user_id}-voice-default"
-        clear_session(sess_id)
-        # We NO LONGER delete from the DB here, so users retain their chat history!
-    except Exception as e:
-        logger.warning("Failed to clear chat history: %s", e)
 
     return AnalyzeResponse(
         profile_id=profile.id,
