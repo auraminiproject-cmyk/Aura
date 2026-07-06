@@ -77,7 +77,7 @@ async def init_db() -> None:
                     "ALTER TABLE body_profiles ADD COLUMN avatar_image_url VARCHAR(512)",
                     "ALTER TABLE sessions ADD COLUMN status VARCHAR(32) DEFAULT 'active'",
                     "ALTER TABLE sessions ADD COLUMN context_json JSON",
-                    "ALTER TABLE sessions ADD COLUMN updated_at DATETIME",
+                    "ALTER TABLE sessions ADD COLUMN updated_at TIMESTAMP",
                     "ALTER TABLE conversations ADD COLUMN language VARCHAR(8)",
                     "ALTER TABLE conversations ADD COLUMN metadata_json JSON",
                 ]
@@ -134,7 +134,7 @@ async def init_db() -> None:
                     "ALTER TABLE body_profiles ADD COLUMN avatar_image_url VARCHAR(512)",
                     "ALTER TABLE sessions ADD COLUMN status VARCHAR(32) DEFAULT 'active'",
                     "ALTER TABLE sessions ADD COLUMN context_json JSON",
-                    "ALTER TABLE sessions ADD COLUMN updated_at DATETIME",
+                    "ALTER TABLE sessions ADD COLUMN updated_at TIMESTAMP",
                     "ALTER TABLE conversations ADD COLUMN language VARCHAR(8)",
                     "ALTER TABLE conversations ADD COLUMN metadata_json JSON",
                 ]
