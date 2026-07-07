@@ -25,6 +25,7 @@ class FashionAiApp extends ConsumerWidget {
     return MaterialApp(
       title: 'AURA Fashion AI',
       debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.light,
       theme: AuraTheme.lightTheme,
       localizationsDelegates: [
         FlutterI18nDelegate(

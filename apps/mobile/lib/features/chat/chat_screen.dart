@@ -1008,7 +1008,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               child: Text(
                 m['text']?.toString() ?? '',
                 style: TextStyle(
-                  color: isUser ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                  color: isUser ? Colors.white : const Color(0xFF1A237E),
                   fontSize: 14.5,
                   height: 1.4,
                 ),

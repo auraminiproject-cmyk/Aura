@@ -475,7 +475,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A237E),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.1)),
       ),
@@ -525,7 +525,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A237E),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.1)),
       ),
@@ -812,7 +812,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Widget _buildMeasurementBox(String label, dynamic value) {
     return Container(
-      decoration: BoxDecoration(color: const Color(0xFF1A237E), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -921,7 +921,7 @@ class _PhotoCard extends StatelessWidget {
                 : Colors.white.withValues(alpha: 0.1),
             width: imagePath != null ? 2 : 1,
           ),
-          color: const Color(0xFF1A237E),
+          color: Colors.white,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(15),
