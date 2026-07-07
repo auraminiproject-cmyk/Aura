@@ -152,19 +152,27 @@ async def node_tryon(state: AgenticState) -> AgenticState:
         
     person_bytes = None
     if image_b64:
-        target_b64 = image_b64
+        try:
+            person_bytes = base64.b64decode(image_b64)
+        except Exception: pass
     elif avatar_b64:
-        target_b64 = avatar_b64
-    else:
+        try:
+            person_bytes = base64.b64decode(avatar_b64)
+        except Exception: pass
+    elif avatar_url:
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(avatar_url)
+                if resp.status_code == 200:
+                    person_bytes = resp.content
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to fetch avatar URL: {e}")
+            
+    if not person_bytes:
         import logging
-        logging.getLogger(__name__).warning("Avatar missing. Skipping try-on.")
-        return state
-        
-    try:
-        person_bytes = base64.b64decode(target_b64)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Avatar decode failed: {e}")
+        logging.getLogger(__name__).warning("Avatar missing or decode failed. Skipping try-on.")
         return state
         
     garment_b64 = outfits[0].get("image_url") or outfits[0].get("image_base64")
