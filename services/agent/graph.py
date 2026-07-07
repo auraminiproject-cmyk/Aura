@@ -184,7 +184,21 @@ async def node_tryon(state: AgenticState) -> AgenticState:
     if garment_b64 and garment_b64.startswith("data:image"):
         garment_b64 = garment_b64.split(",")[1]
         
-    garment_bytes = base64.b64decode(garment_b64) if garment_b64 else None
+    garment_bytes = None
+    if garment_b64 and garment_b64.startswith("http"):
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(garment_b64)
+                if resp.status_code == 200:
+                    garment_bytes = resp.content
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to fetch garment URL: {e}")
+    elif garment_b64:
+        try:
+            garment_bytes = base64.b64decode(garment_b64)
+        except Exception: pass
     
     if not garment_bytes:
         import logging
