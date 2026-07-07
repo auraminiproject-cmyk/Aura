@@ -83,32 +83,32 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(colors: [
-                  const Color(0xFF8B1538).withValues(alpha: 0.3),
-                  const Color(0xFF4A148C).withValues(alpha: 0.3),
+                  Colors.white,
+                  Colors.white,
                 ]),
               ),
               child: const Icon(Icons.brush, size: 40, color: Color(0xFFD4AF37)),
             ),
             const SizedBox(height: 20),
             const Text('No designs yet',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                style: TextStyle(color: Color(0xFF1A237E), fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             Text(
               'Start a conversation in the Chat tab.\nDescribe your dream outfit, and the AI will design it for you with measurements and shopping links.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, height: 1.5),
+              style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 13, height: 1.5),
             ),
             const SizedBox(height: 24),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(30),
-                gradient: const LinearGradient(colors: [Color(0xFF8B1538), Color(0xFF6A0F2B)]),
+                color: Colors.white,
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                  const Icon(Icons.auto_awesome, color: Color(0xFF1A237E), size: 18),
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
@@ -125,7 +125,7 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                       }
                     },
                     child: const Text('Go to Chat',
-                        style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                        style: TextStyle(color: Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -165,8 +165,8 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF8B1538).withValues(alpha: 0.15),
-            const Color(0xFF4A148C).withValues(alpha: 0.1),
+            Colors.white,
+            Colors.white,
           ],
         ),
         border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.2)),
@@ -183,9 +183,9 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                   width: 44, height: 44,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    gradient: const LinearGradient(colors: [Color(0xFF8B1538), Color(0xFF4A148C)]),
+                    color: Colors.white,
                   ),
-                  child: const Icon(Icons.brush, color: Colors.white, size: 22),
+                  child: const Icon(Icons.brush, color: Color(0xFF1A237E), size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -193,10 +193,10 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(name,
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(color: Color(0xFF1A237E), fontSize: 15, fontWeight: FontWeight.w600)),
                       if (dateStr.isNotEmpty)
                         Text(dateStr,
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11)),
+                            style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.4), fontSize: 11)),
                     ],
                   ),
                 ),
@@ -205,10 +205,10 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      color: const Color(0xFF1B5E20).withValues(alpha: 0.3),
+                      color: Colors.white,
                     ),
                     child: const Text('Tailored',
-                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600)),
+                        style: TextStyle(color: Color(0xFF1A237E), fontSize: 10, fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
@@ -233,7 +233,7 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
               const SizedBox(height: 10),
               Text(styleNotes,
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Color(0xFF1A237E).withValues(alpha: 0.6),
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
                       height: 1.4)),
@@ -258,19 +258,19 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Colors.white.withValues(alpha: 0.04),
+        color: Color(0xFF1A237E).withValues(alpha: 0.04),
       ),
       child: Row(
         children: [
-          Icon(Icons.straighten, size: 14, color: Colors.green.shade300),
+          Icon(Icons.straighten, size: 14, color: Color(0xFF4A90E2)),
           const SizedBox(width: 6),
           if (fabricReq != null)
             Text('${fabricReq['total_meters']}m fabric',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
+                style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11)),
           if (cut != null) ...[
-            Text(' • ', style: TextStyle(color: Colors.white.withValues(alpha: 0.3))),
+            Text(' • ', style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.3))),
             Text('Chest: ${cut['chest_cut_cm']}cm',
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 11)),
+                style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11)),
           ],
         ],
       ),
@@ -282,11 +282,11 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
-        color: Colors.white.withValues(alpha: 0.06),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        color: Color(0xFF1A237E).withValues(alpha: 0.06),
+        border: Border.all(color: Color(0xFF1A237E).withValues(alpha: 0.08)),
       ),
       child: Text(text,
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.75), fontSize: 12)),
+          style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.75), fontSize: 12)),
     );
   }
 }

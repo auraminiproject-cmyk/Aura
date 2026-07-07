@@ -934,7 +934,7 @@ class _PhotoCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black.withValues(alpha: 0.7)],
+                          colors: [Colors.transparent, Colors.white.withValues(alpha: 0.9)],
                         ),
                       ),
                     ),
@@ -967,7 +967,7 @@ class _PhotoCard extends StatelessWidget {
                       top: 8, right: 8,
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(8)),
+                        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), borderRadius: BorderRadius.circular(8)),
                         child: const Icon(Icons.refresh, color: const Color(0xFF1A237E), size: 16),
                       ),
                     ),

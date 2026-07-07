@@ -678,10 +678,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(colors: [
-            Color(0xFF1B5E20).withValues(alpha: 0.4),
-            Color(0xFF2E7D32).withValues(alpha: 0.3),
-          ]),
+          color: Colors.white,
           border: Border.all(color: Color(0xFF66BB6A).withValues(alpha: 0.3)),
         ),
         child: Column(
@@ -692,7 +689,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             Text(
               m['text'] ?? '',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.85),
+                color: Color(0xFF1A237E),
                 fontSize: 13,
                 height: 1.5,
                 fontFamily: 'monospace',
@@ -727,16 +724,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color.lerp(
-                  Color(0xFF8B1538).withValues(alpha: 0.8),
-                  Color(0xFFFF1744).withValues(alpha: 0.9),
-                  _pulseCtrl.value,
-                )!,
-                Color(0xFF4A148C).withValues(alpha: 0.9),
-              ],
-            ),
+            color: Colors.white,
           ),
           child: Row(
             children: [
@@ -787,11 +775,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                    border: Border.all(color: Color(0xFF1A237E).withValues(alpha: 0.2)),
                   ),
-                  child: const Icon(Icons.stop_rounded, color: Colors.white, size: 20),
+                  child: const Icon(Icons.stop_rounded, color: Color(0xFF1A237E), size: 20),
                 ),
               ),
             ],
@@ -806,12 +794,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Color(0xFF1B5E20).withValues(alpha: 0.8),
-            Color(0xFF004D40).withValues(alpha: 0.8),
-          ],
-        ),
+        color: Colors.white,
       ),
       child: Row(
         children: [
