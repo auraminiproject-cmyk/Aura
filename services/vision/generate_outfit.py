@@ -46,6 +46,8 @@ async def generate_outfits(
     smplx_params: dict | None = None,
     num_variants: int = 4,
     clip_threshold: float = 0.28,
+    user_gender: str | None = None,
+    user_photo_b64: str | None = None,
 ) -> OutfitGenerationResult:
     """Generate outfit images using SDXL via HF Inference API.
 
@@ -55,18 +57,35 @@ async def generate_outfits(
     variants: list[OutfitVariant] = []
     seed_base = hashlib.sha256(design_brief.encode()).hexdigest()
 
+    from services.vision.tryon import virtual_tryon
+
+    gender_suffix = ""
+    if user_gender and user_gender.lower() not in ["neutral", ""]:
+        gender_suffix = f", worn by a {user_gender} model, photorealistic face"
+
     for i in range(min(num_variants, len(_PROMPT_TEMPLATES))):
-        prompt = _PROMPT_TEMPLATES[i].format(brief=design_brief)
+        prompt = _PROMPT_TEMPLATES[i].format(brief=design_brief) + gender_suffix
 
         # Try HF Inference API for SDXL
         if settings.huggingface_api_key and hf_breaker.current_state != "open":
             try:
                 image_bytes = await _hf_sdxl_generate(prompt, settings)
                 if image_bytes and len(image_bytes) > 500:
+                    outfit_b64 = base64.b64encode(image_bytes).decode("ascii")
+                    
+                    if user_photo_b64:
+                        try:
+                            # Apply virtual try-on automatically if user photo is available
+                            tryon_res = await virtual_tryon(outfit_image_b64=outfit_b64, user_photo_b64=user_photo_b64)
+                            if tryon_res and "result_image_base64" in tryon_res:
+                                outfit_b64 = tryon_res["result_image_base64"]
+                        except Exception as e:
+                            logger.error(f"Tryon failed during generation: {e}")
+
                     variants.append(OutfitVariant(
-                        image_base64=base64.b64encode(image_bytes).decode("ascii"),
+                        image_base64=outfit_b64,
                         prompt=prompt,
-                        clip_score=0.0,  # Real score: computed below if FashionCLIP available
+                        clip_score=0.0,
                     ))
                     continue
             except Exception as exc:

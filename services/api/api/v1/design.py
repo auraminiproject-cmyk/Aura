@@ -34,6 +34,8 @@ async def create_outfits(
     smplx_params = body.smplx_params
 
     # Auto-fetch stored body profile if none provided
+    user_gender = None
+    user_photo_b64 = None
     if not smplx_params:
         result = await db.execute(
             select(BodyProfile)
@@ -42,13 +44,19 @@ async def create_outfits(
             .limit(1)
         )
         profile = result.scalars().first()
-        if profile and profile.smplx_params:
-            smplx_params = profile.smplx_params
+        if profile:
+            if profile.smplx_params:
+                smplx_params = profile.smplx_params
+            user_gender = profile.gender
+            if profile.measurements and isinstance(profile.measurements, dict) and "_front_photo_b64" in profile.measurements:
+                user_photo_b64 = profile.measurements["_front_photo_b64"]
 
     result = await generate_outfits(
         design_brief=body.brief,
         smplx_params=smplx_params,
         num_variants=body.num_variants,
+        user_gender=user_gender,
+        user_photo_b64=user_photo_b64,
     )
     return DesignResponse(
         variants=[v.__dict__ for v in result.variants],

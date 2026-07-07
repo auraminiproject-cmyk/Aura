@@ -59,39 +59,52 @@ async def virtual_tryon(*, outfit_image_b64: str, user_photo_b64: str) -> dict:
 
 
 async def _kolors_tryon(outfit_b64: str, user_b64: str, settings) -> str | None:
-    """Call Kolors VTON via HF Spaces Gradio API."""
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        # HF Spaces Gradio API endpoint
-        resp = await client.post(
-            f"https://{KOLORS_VTON_SPACE.replace('/', '-').lower()}.hf.space/api/predict",
-            json={
-                "data": [
-                    f"data:image/png;base64,{user_b64}",
-                    f"data:image/png;base64,{outfit_b64}",
-                ],
-            },
-        )
-        if resp.status_code == 503:
-            hf_breaker.fail()
-            logger.info("Kolors VTON Space loading (cold start)")
+    """Call IDM-VTON via HF Spaces Gradio Client."""
+    import asyncio
+    import os
+    import tempfile
+    
+    def run_vton():
+        try:
+            from gradio_client import Client, handle_file
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_user:
+                f_user.write(base64.b64decode(user_b64))
+                user_path = f_user.name
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as f_outfit:
+                f_outfit.write(base64.b64decode(outfit_b64))
+                outfit_path = f_outfit.name
+                
+            client = Client("yisol/IDM-VTON")
+            result = client.predict(
+                dict={"background": handle_file(user_path), "layers": [], "composite": None},
+                garm_img=handle_file(outfit_path),
+                garment_des="fashion outfit",
+                is_checked=True,
+                is_checked_crop=False,
+                denoise_steps=20,
+                seed=42,
+                api_name="/tryon"
+            )
+            res_path = result[0]
+            with open(res_path, "rb") as f:
+                res_b64 = base64.b64encode(f.read()).decode("ascii")
+                
+            os.remove(user_path)
+            os.remove(outfit_path)
+            return res_b64
+        except ImportError:
+            logger.warning("gradio_client not installed, skipping VTON")
             return None
-        if resp.status_code != 200:
-            logger.warning("Kolors VTON returned %d", resp.status_code)
+        except Exception as e:
+            logger.warning(f"IDM-VTON failed: {e}")
+            if 'user_path' in locals() and os.path.exists(user_path):
+                os.remove(user_path)
+            if 'outfit_path' in locals() and os.path.exists(outfit_path):
+                os.remove(outfit_path)
             return None
 
-        hf_breaker.success()
-        data = resp.json()
-        # Gradio returns {"data": ["data:image/png;base64,..."]}
-        if "data" in data and data["data"]:
-            result = data["data"][0]
-            if isinstance(result, str) and "base64," in result:
-                return result.split("base64,", 1)[1]
-            if isinstance(result, dict) and "url" in result:
-                # Download the result image
-                img_resp = await client.get(result["url"])
-                if img_resp.status_code == 200:
-                    return base64.b64encode(img_resp.content).decode("ascii")
-        return None
+    return await asyncio.to_thread(run_vton)
 
 
 def _blend_composite(outfit_b64: str, user_b64: str) -> str:
