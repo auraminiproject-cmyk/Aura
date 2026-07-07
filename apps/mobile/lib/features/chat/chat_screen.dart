@@ -358,8 +358,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
   Widget build(BuildContext context) {
     final connState = ref.watch(connectionStateProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return AuraBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         title: Row(
@@ -451,7 +452,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           _buildInputBar(),
         ],
       ),
-    );
+    ));
   }
 
   // ── Finalize trigger — calls API and shows rich results ─────────

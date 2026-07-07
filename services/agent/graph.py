@@ -72,7 +72,7 @@ async def node_body_analysis(state: AgenticState) -> AgenticState:
     return {**state, "profile_data": profile_data, "context": ctx}
 
 async def node_extraction(state: AgenticState) -> AgenticState:
-    if state["intent"] == "design_request":
+    if state["intent"] == "design_request" or state.get("plan_goal") == "FINALIZE":
         gender = state.get("profile_data", {}).get("gender", "neutral")
         params = await extract_params_llm(state["message"], state["language"], gender, state.get("history", []))
     else:
