@@ -47,10 +47,10 @@ class _AuraBackgroundState extends State<AuraBackground>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFFE3F2FD), // Light icy blue
-                Color(0xFFBBDEFB), // Soft blue
-                Color(0xFF90CAF9), // Light blue
-                Color(0xFFE3F2FD), // Back to light blue
+                Color(0xFF42A5F5), // Light blue
+                Color(0xFF2196F3), // Vibrant blue
+                Color(0xFF1E88E5), // Deeper blue
+                Color(0xFF42A5F5), // Back to light blue
               ],
               stops: [0.0, 0.35, 0.7, 1.0],
             ),
@@ -230,11 +230,11 @@ class _MeshNode {
 
 /// Premium light theme for the entire app
 class AuraTheme {
-  static const _brandBlue = Color(0xFF4A90E2);
-  static const _surfaceLight = Color(0xFFF5F9FF);
-  static const _surfaceCard = Color(0xFFFFFFFF);
-  static const _textPrimary = Color(0xFF1A237E);
-  static const _textSecondary = Color(0xFF5C6BC0);
+  static const _brandBlue = Color(0xFF1976D2);
+  static const _surfaceLight = Color(0xFF64B5F6);
+  static const _surfaceCard = Color(0xFF42A5F5);
+  static const _textPrimary = Colors.white;
+  static const _textSecondary = Colors.white70;
 
   static const _surfaceDark = Color(0xFF0F172A);
   static const _surfaceCardDark = Color(0xFF1E293B);

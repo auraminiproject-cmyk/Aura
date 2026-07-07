@@ -46,15 +46,23 @@ def extract_params_heuristic(message: str) -> DesignParams:
     return params
 
 
-async def extract_params_llm(message: str, language: str, gender: str = "neutral") -> DesignParams:
+async def extract_params_llm(message: str, language: str, gender: str = "neutral", history: list[dict[str, Any]] = None) -> DesignParams:
+    history_str = ""
+    if history:
+        history_str = "Conversation History:\n" + "\n".join([f"{msg['role']}: {msg['content']}" for msg in history[-6:]]) + "\n\n"
+
     system = (
         "Extract fashion design parameters as JSON with keys: "
         "occasion, budget_inr, colors (array), body_type, cultural_context, garment_types (array). "
-        f"The client's gender is '{gender}'. If the user asks for a general outfit without naming a specific clothing item, you MUST infer 1-2 appropriate specific garment types (e.g. ['suit'] for men's formal, or ['sherwani'] for Indian weddings, or ['lehenga'] for women). NEVER just return ['outfit'] or an empty array if an outfit is requested. "
+        f"The client's gender is '{gender}'. "
+        "Review the conversation history and the latest message to determine the FINAL agreed upon outfit. "
+        "If the latest message is a generic confirmation (like 'finalize' or 'yes'), extract the parameters from the history. "
+        "If the user asks for a general outfit without naming a specific clothing item, you MUST infer 1-2 appropriate specific garment types. "
+        "NEVER just return ['outfit'] or an empty array if an outfit is requested. "
         "Return ONLY valid JSON."
     )
     try:
-        raw = await complete(f"Message ({language}): {message}", system=system, temperature=0.1)
+        raw = await complete(f"{history_str}Latest Message ({language}): {message}", system=system, temperature=0.1)
         start = raw.find("{")
         end = raw.rfind("}") + 1
         if start >= 0 and end > start:

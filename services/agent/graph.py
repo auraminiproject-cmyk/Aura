@@ -74,7 +74,7 @@ async def node_body_analysis(state: AgenticState) -> AgenticState:
 async def node_extraction(state: AgenticState) -> AgenticState:
     if state["intent"] == "design_request":
         gender = state.get("profile_data", {}).get("gender", "neutral")
-        params = await extract_params_llm(state["message"], state["language"], gender)
+        params = await extract_params_llm(state["message"], state["language"], gender, state.get("history", []))
     else:
         params = extract_params_heuristic(state["message"])
         
@@ -111,6 +111,16 @@ async def node_outfit_gen(state: AgenticState) -> AgenticState:
     if garment: brief_parts.append(garment)
     else: brief_parts.append("outfit")
     
+    measurements = state.get("profile_data", {}).get("measurements", {})
+    if measurements:
+        try:
+            from services.agent.body_analyzer import analyze
+            analysis = analyze(measurements)
+            if analysis and analysis.body_type:
+                brief_parts.append(f"designed for {analysis.body_type} body shape")
+        except Exception:
+            pass
+            
     occasion = params_data.get("occasion")
     if occasion: brief_parts.append(f"for {occasion}")
     
