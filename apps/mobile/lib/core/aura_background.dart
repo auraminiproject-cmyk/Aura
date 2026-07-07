@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 /// Premium animated wired/mesh background with floating particles.
-/// Creates a dark futuristic aesthetic with glowing connection lines.
+/// Creates a light icy blue futuristic aesthetic with glowing connection lines.
 class AuraBackground extends StatefulWidget {
   final Widget child;
   final bool showMesh;
@@ -47,10 +47,10 @@ class _AuraBackgroundState extends State<AuraBackground>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFF0A0A0F),  // Deep black
-                Color(0xFF0D0B1A),  // Dark indigo
-                Color(0xFF120A1E),  // Deep purple-black
-                Color(0xFF0A0A0F),  // Back to black
+                Color(0xFFE3F2FD),  // Light icy blue
+                Color(0xFFBBDEFB),  // Soft blue
+                Color(0xFF90CAF9),  // Light blue
+                Color(0xFFE3F2FD),  // Back to light blue
               ],
               stops: [0.0, 0.35, 0.7, 1.0],
             ),
@@ -74,7 +74,7 @@ class _AuraBackgroundState extends State<AuraBackground>
           top: -80,
           right: -60,
           child: _GlowOrb(
-            color: const Color(0xFF8B1538),
+            color: const Color(0xFF64B5F6),
             size: 280,
             controller: _ctrl,
             offset: 0.0,
@@ -84,7 +84,7 @@ class _AuraBackgroundState extends State<AuraBackground>
           bottom: -100,
           left: -80,
           child: _GlowOrb(
-            color: const Color(0xFF1A237E),
+            color: const Color(0xFF2196F3),
             size: 320,
             controller: _ctrl,
             offset: 0.5,
@@ -94,7 +94,7 @@ class _AuraBackgroundState extends State<AuraBackground>
           top: MediaQuery.of(context).size.height * 0.4,
           right: -40,
           child: _GlowOrb(
-            color: const Color(0xFF4A148C),
+            color: const Color(0xFF1976D2),
             size: 200,
             controller: _ctrl,
             offset: 0.3,
@@ -191,8 +191,8 @@ class _WireMeshPainter extends CustomPainter {
       for (var j = i + 1; j < positions.length; j++) {
         final dist = (positions[i] - positions[j]).distance;
         if (dist < maxDist) {
-          final alpha = (1.0 - dist / maxDist) * 0.12;
-          linePaint.color = Color.fromRGBO(139, 21, 56, alpha); // Brand crimson
+          final alpha = (1.0 - dist / maxDist) * 0.2;
+          linePaint.color = Color.fromRGBO(74, 144, 226, alpha); // Brand Blue
           canvas.drawLine(positions[i], positions[j], linePaint);
         }
       }
@@ -200,11 +200,11 @@ class _WireMeshPainter extends CustomPainter {
 
     // Draw nodes
     for (var i = 0; i < positions.length; i++) {
-      final glowAlpha = 0.15 + 0.15 * sin(progress * 2 * pi + _nodes[i].phase);
-      nodePaint.color = Color.fromRGBO(200, 150, 255, glowAlpha);
+      final glowAlpha = 0.3 + 0.3 * sin(progress * 2 * pi + _nodes[i].phase);
+      nodePaint.color = Color.fromRGBO(100, 181, 246, glowAlpha);
       canvas.drawCircle(positions[i], _nodes[i].radius, nodePaint);
       // Inner bright point
-      nodePaint.color = Color.fromRGBO(255, 255, 255, glowAlpha * 0.6);
+      nodePaint.color = Color.fromRGBO(255, 255, 255, glowAlpha * 0.8);
       canvas.drawCircle(positions[i], _nodes[i].radius * 0.4, nodePaint);
     }
   }
@@ -227,29 +227,28 @@ class _MeshNode {
   });
 }
 
-/// Premium dark theme for the entire app
+/// Premium light theme for the entire app
 class AuraTheme {
-  static const _brandCrimson = Color(0xFF8B1538);
-  static const _brandGold = Color(0xFFD4AF37);
-  static const _surfaceDark = Color(0xFF121218);
-  static const _surfaceCard = Color(0xFF1A1A24);
-  static const _textPrimary = Color(0xFFF0EBF4);
-  static const _textSecondary = Color(0xFF9E95A9);
+  static const _brandBlue = Color(0xFF4A90E2);
+  static const _surfaceLight = Color(0xFFF5F9FF);
+  static const _surfaceCard = Color(0xFFFFFFFF);
+  static const _textPrimary = Color(0xFF1A237E);
+  static const _textSecondary = Color(0xFF5C6BC0);
 
-  static ThemeData get darkTheme {
+  static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: Colors.transparent,
-      colorScheme: ColorScheme.dark(
-        primary: _brandCrimson,
-        secondary: _brandGold,
-        surface: _surfaceDark,
+      colorScheme: ColorScheme.light(
+        primary: _brandBlue,
+        secondary: _brandBlue,
+        surface: _surfaceLight,
         onSurface: _textPrimary,
         onPrimary: Colors.white,
-        primaryContainer: _brandCrimson.withValues(alpha: 0.2),
-        secondaryContainer: _brandGold.withValues(alpha: 0.15),
-        outline: Colors.white.withValues(alpha: 0.08),
+        primaryContainer: _brandBlue.withValues(alpha: 0.1),
+        secondaryContainer: _brandBlue.withValues(alpha: 0.05),
+        outline: _brandBlue.withValues(alpha: 0.2),
       ),
       fontFamily: 'Roboto',
       textTheme: const TextTheme(
@@ -291,14 +290,14 @@ class AuraTheme {
         iconTheme: IconThemeData(color: _textPrimary.withValues(alpha: 0.8)),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: _surfaceDark.withValues(alpha: 0.95),
-        indicatorColor: _brandCrimson.withValues(alpha: 0.25),
+        backgroundColor: _surfaceCard.withValues(alpha: 0.95),
+        indicatorColor: _brandBlue.withValues(alpha: 0.15),
         labelTextStyle: const WidgetStatePropertyAll(
           TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500),
         ),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(color: _brandGold, size: 24);
+            return const IconThemeData(color: _brandBlue, size: 24);
           }
           return IconThemeData(color: _textSecondary.withValues(alpha: 0.6), size: 22);
         }),
@@ -307,18 +306,18 @@ class AuraTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: _surfaceCard,
+        fillColor: _surfaceCard.withValues(alpha: 0.8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          borderSide: BorderSide(color: _brandBlue.withValues(alpha: 0.2)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          borderSide: BorderSide(color: _brandBlue.withValues(alpha: 0.2)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: _brandCrimson, width: 1.5),
+          borderSide: const BorderSide(color: _brandBlue, width: 1.5),
         ),
         hintStyle: TextStyle(color: _textSecondary.withValues(alpha: 0.5), fontSize: 14),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -330,7 +329,7 @@ class AuraTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: ButtonStyle(
-          backgroundColor: const WidgetStatePropertyAll(_brandCrimson),
+          backgroundColor: const WidgetStatePropertyAll(_brandBlue),
           foregroundColor: const WidgetStatePropertyAll(Colors.white),
           shape: WidgetStatePropertyAll(
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -338,29 +337,29 @@ class AuraTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        color: _surfaceCard,
+        color: _surfaceCard.withValues(alpha: 0.9),
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+          side: BorderSide(color: _brandBlue.withValues(alpha: 0.1)),
         ),
       ),
       dividerTheme: DividerThemeData(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: _brandBlue.withValues(alpha: 0.1),
       ),
     );
   }
 
   // Glassmorphic card decoration
   static BoxDecoration get glassCard => BoxDecoration(
-        color: _surfaceCard.withValues(alpha: 0.6),
+        color: _surfaceCard.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.08),
+          color: _brandBlue.withValues(alpha: 0.15),
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
+            color: _brandBlue.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -373,8 +372,8 @@ class AuraTheme {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
+            _surfaceCard.withValues(alpha: 0.9),
             _surfaceCard,
-            _surfaceCard.withValues(alpha: 0.8),
           ],
         ),
         borderRadius: const BorderRadius.only(
@@ -384,8 +383,15 @@ class AuraTheme {
           bottomRight: Radius.circular(20),
         ),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: _brandBlue.withValues(alpha: 0.15),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: _brandBlue.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       );
 
   // Gradient for chat bubbles (user)
@@ -394,8 +400,8 @@ class AuraTheme {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF8B1538),
-            Color(0xFF6A0F2B),
+            Color(0xFF4A90E2),
+            Color(0xFF1976D2),
           ],
         ),
         borderRadius: const BorderRadius.only(
@@ -406,7 +412,7 @@ class AuraTheme {
         ),
         boxShadow: [
           BoxShadow(
-            color: _brandCrimson.withValues(alpha: 0.3),
+            color: _brandBlue.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),

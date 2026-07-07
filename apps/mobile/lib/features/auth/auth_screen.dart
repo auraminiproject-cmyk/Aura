@@ -121,7 +121,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0A10),
+      backgroundColor: const Color(0xFFF5F9FF),
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SafeArea(
@@ -139,11 +139,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFFD4AF37), Color(0xFF8B6914)],
+                      colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                        color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
                         blurRadius: 30,
                         spreadRadius: 5,
                       ),
@@ -159,7 +159,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 // Title
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFFD4AF37), Color(0xFFF5E6A3), Color(0xFFD4AF37)],
+                    colors: [Color(0xFF4A90E2), Color(0xFF2196F3), Color(0xFF4A90E2)],
                   ).createShader(bounds),
                   child: const Text(
                     'AURA',
@@ -176,9 +176,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   'Your AI Fashion Designer',
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.white.withValues(alpha: 0.6),
+                    color: const Color(0xFF1A237E).withValues(alpha: 0.6),
                     letterSpacing: 2,
-                    fontWeight: FontWeight.w300,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -187,23 +187,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                      color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
                     ),
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: Colors.white,
                   ),
                   child: TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Email address',
                       hintStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: const Color(0xFF1A237E).withValues(alpha: 0.3),
                         fontSize: 16,
                       ),
                       prefixIcon: Icon(
                         Icons.email_outlined,
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: const Color(0xFF1A237E).withValues(alpha: 0.4),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -220,23 +220,23 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                      color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
                     ),
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: Colors.white,
                   ),
                   child: TextField(
                     controller: _passwordController,
                     obscureText: true,
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Password',
                       hintStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: const Color(0xFF1A237E).withValues(alpha: 0.3),
                         fontSize: 16,
                       ),
                       prefixIcon: Icon(
                         Icons.lock_outline,
-                        color: Colors.white.withValues(alpha: 0.4),
+                        color: const Color(0xFF1A237E).withValues(alpha: 0.4),
                       ),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -255,22 +255,22 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                        color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
                       ),
-                      color: Colors.white.withValues(alpha: 0.05),
+                      color: Colors.white,
                     ),
                     child: TextField(
                       controller: _nameController,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
                       decoration: InputDecoration(
                         hintText: 'Your name (optional)',
                         hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
+                          color: const Color(0xFF1A237E).withValues(alpha: 0.3),
                           fontSize: 16,
                         ),
                         prefixIcon: Icon(
                           Icons.person_outline,
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: const Color(0xFF1A237E).withValues(alpha: 0.4),
                         ),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
@@ -289,17 +289,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                        color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
                       ),
-                      color: Colors.white.withValues(alpha: 0.05),
+                      color: Colors.white,
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: _gender,
-                        dropdownColor: const Color(0xFF1A1A24),
+                        dropdownColor: Colors.white,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: Colors.white.withValues(alpha: 0.4)),
-                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                        icon: Icon(Icons.arrow_drop_down, color: const Color(0xFF1A237E).withValues(alpha: 0.4)),
+                        style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
                         items: ['Neutral', 'Masculine', 'Feminine'].map((String value) {
                           return DropdownMenuItem<String>(
                             value: value,
@@ -324,28 +324,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                          color: const Color(0xFF4A90E2).withValues(alpha: 0.3),
                         ),
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: Colors.white,
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.photo_camera_outlined,
-                            color: Colors.white.withValues(alpha: 0.4),
+                            color: const Color(0xFF1A237E).withValues(alpha: 0.4),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Text(
                               _profilePhoto != null ? 'Photo selected' : 'Upload profile photo (optional)',
                               style: TextStyle(
-                                color: _profilePhoto != null ? Colors.white : Colors.white.withValues(alpha: 0.3),
+                                color: _profilePhoto != null ? const Color(0xFF1A237E) : const Color(0xFF1A237E).withValues(alpha: 0.3),
                                 fontSize: 16,
                               ),
                             ),
                           ),
                           if (_profilePhoto != null)
-                            const Icon(Icons.check_circle, color: Color(0xFFD4AF37)),
+                            const Icon(Icons.check_circle, color: Color(0xFF4A90E2)),
                         ],
                       ),
                     ),
@@ -359,7 +359,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     child: Text(
                       _error!,
                       style: TextStyle(
-                        color: Colors.red.shade300,
+                        color: Colors.red.shade400,
                         fontSize: 13,
                       ),
                       textAlign: TextAlign.center,
@@ -372,8 +372,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   child: ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4AF37),
-                      foregroundColor: Colors.black,
+                      backgroundColor: const Color(0xFF4A90E2),
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -385,7 +385,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                             height: 24,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.black,
+                              color: Colors.white,
                             ),
                           )
                         : Text(
@@ -411,7 +411,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         ? 'Already have an account? Log In'
                         : "Don't have an account? Sign Up",
                     style: TextStyle(
-                      color: const Color(0xFFD4AF37).withValues(alpha: 0.8),
+                      color: const Color(0xFF4A90E2).withValues(alpha: 0.8),
                       fontSize: 14,
                     ),
                   ),

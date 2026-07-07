@@ -43,18 +43,18 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         title: const Text('My Wardrobe',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFFD4AF37)),
+            icon: const Icon(Icons.refresh, color: Color(0xFF4A90E2)),
             onPressed: _load,
           ),
         ],
       ),
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFFD4AF37)))
+              child: CircularProgressIndicator(color: Color(0xFF4A90E2)))
           : _items.isEmpty
               ? _buildEmptyState()
               : ListView.builder(
@@ -75,20 +75,20 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
             height: 80,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withValues(alpha: 0.06),
+              color: Color(0xFF4A90E2).withValues(alpha: 0.1),
             ),
             child: Icon(Icons.checkroom_outlined,
-                size: 40, color: Colors.white.withValues(alpha: 0.3)),
+                size: 40, color: Color(0xFF4A90E2).withValues(alpha: 0.4)),
           ),
           const SizedBox(height: 16),
           Text('No saved outfits yet',
               style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7), fontSize: 17)),
+                  color: const Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 17)),
           const SizedBox(height: 8),
           Text(
             'Finalize an outfit in Chat to save it here',
             style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4), fontSize: 13),
+                color: const Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 13),
           ),
         ],
       ),
@@ -129,12 +129,12 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withValues(alpha: 0.08),
-            Colors.white.withValues(alpha: 0.03),
+            Colors.white,
+            Color(0xFFF5F9FF),
           ],
         ),
         border: Border.all(
-            color: const Color(0xFFD4AF37).withValues(alpha: 0.2)),
+            color: const Color(0xFF4A90E2).withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -152,7 +152,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                     shape: BoxShape.circle,
                     color: _colorFromName(color),
                     border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.3)),
+                        color: Color(0xFF4A90E2).withValues(alpha: 0.4)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -162,21 +162,21 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                     children: [
                       Text(name,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: const Color(0xFF1A237E),
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           )),
                       if (dateStr.isNotEmpty)
                         Text(dateStr,
                             style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.4),
+                                color: const Color(0xFF1A237E).withValues(alpha: 0.5),
                                 fontSize: 11)),
                     ],
                   ),
                 ),
                 // Badges
                 if (hasTryon)
-                  _badge('Try-On', const Color(0xFF4A148C)),
+                  _badge('Try-On', const Color(0xFF4A90E2)),
                 if (tailoring != null) ...[
                   const SizedBox(width: 6),
                   _badge('Tailored', const Color(0xFF1B5E20)),
@@ -221,7 +221,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: const Color(0xFF1B5E20).withValues(alpha: 0.15),
+          color: const Colors.green.shade50,
           border: Border.all(
               color: const Color(0xFF66BB6A).withValues(alpha: 0.2)),
         ),
@@ -251,7 +251,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                     .map((e) => Text(
                           '${e.key.replaceAll('_cut_cm', '').replaceAll('_', ' ')}: ${e.value}cm',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.7),
+                              color: const Color(0xFF1A237E).withValues(alpha: 0.8),
                               fontSize: 11,
                               fontFamily: 'monospace'),
                         ))
@@ -263,7 +263,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                 child: Text(
                   'Fabric: ${fabricReq['total_meters']}m needed',
                   style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: Colors.green.shade800,
                       fontSize: 11),
                 ),
               ),
@@ -291,16 +291,16 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(8),
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Color(0xFF4A90E2).withValues(alpha: 0.1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 12, color: const Color(0xFFD4AF37)),
+          Icon(icon, size: 12, color: const Color(0xFF4A90E2)),
           const SizedBox(width: 4),
           Text(text,
               style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7), fontSize: 11)),
+                  color: const Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 11)),
         ],
       ),
     );
@@ -317,6 +317,6 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
     if (n.contains('white') || n.contains('ivory')) return Colors.white;
     if (n.contains('black')) return Colors.grey.shade800;
     if (n.contains('orange') || n.contains('coral')) return Colors.orange;
-    return const Color(0xFFD4AF37);
+    return const Color(0xFF4A90E2);
   }
 }

@@ -7,30 +7,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/aura_background.dart';
 import 'core/api_provider.dart';
 import 'features/auth/auth_screen.dart';
-import 'features/chat/chat_screen.dart';
-import 'features/home/status_banner.dart';
-import 'features/avatar/profile_screen.dart';
-import 'features/design/design_screen.dart';
-import 'features/products/product_results_screen.dart';
-import 'features/wardrobe/wardrobe_screen.dart';
+import 'features/home/home_screen.dart';
 
 class FashionAiApp extends ConsumerWidget {
   const FashionAiApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Force dark status bar icons on dark background
+    // Force dark status bar icons on light background
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF121218),
-      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarColor: Color(0xFFF5F9FF),
+      systemNavigationBarIconBrightness: Brightness.dark,
     ));
 
     return MaterialApp(
       title: 'AURA Fashion AI',
       debugShowCheckedModeBanner: false,
-      theme: AuraTheme.darkTheme,
+      theme: AuraTheme.lightTheme,
       localizationsDelegates: [
         FlutterI18nDelegate(
           translationLoader: FileTranslationLoader(
@@ -56,7 +51,7 @@ class FashionAiApp extends ConsumerWidget {
   }
 }
 
-/// Gates the app: shows AuthScreen until authenticated, then MainShell.
+/// Gates the app: shows AuthScreen until authenticated, then HomeScreen.
 class _AuthGate extends ConsumerStatefulWidget {
   const _AuthGate();
 
@@ -75,10 +70,10 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
 
     return initAsync.when(
       loading: () => const Scaffold(
-        backgroundColor: Color(0xFF0A0A10),
+        backgroundColor: Color(0xFFE3F2FD),
         body: Center(
           child: CircularProgressIndicator(
-            color: Color(0xFFD4AF37),
+            color: Color(0xFF4A90E2),
           ),
         ),
       ),
@@ -87,7 +82,7 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
       ),
       data: (restored) {
         if (restored || isAuth || _ready) {
-          return const MainShell();
+          return const HomeScreen();
         }
         return AuthScreen(
           onAuthenticated: () => setState(() => _ready = true),
@@ -97,65 +92,3 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
   }
 }
 
-class MainShell extends StatefulWidget {
-  const MainShell({super.key});
-
-  @override
-  State<MainShell> createState() => _MainShellState();
-}
-
-class _MainShellState extends State<MainShell> {
-  int _index = 0;
-
-  static const _tabs = [
-    ('Chat', Icons.auto_awesome, Icons.auto_awesome_outlined),
-    ('Profile', Icons.person, Icons.person_outline),
-    ('Design', Icons.brush, Icons.brush_outlined),
-    ('Shop', Icons.shopping_bag, Icons.shopping_bag_outlined),
-    ('Wardrobe', Icons.checkroom, Icons.checkroom_outlined),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final screens = [
-      const ChatScreen(),
-      const ProfileScreen(),
-      const DesignScreen(),
-      const ProductResultsScreen(),
-      const WardrobeScreen(),
-    ];
-
-    return AuraBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Column(
-          children: [
-            const StatusBanner(),
-            Expanded(child: screens[_index]),
-          ],
-        ),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: Colors.white.withValues(alpha: 0.06),
-              ),
-            ),
-          ),
-          child: NavigationBar(
-            selectedIndex: _index,
-            onDestinationSelected: (i) => setState(() => _index = i),
-            destinations: [
-              for (final t in _tabs)
-                NavigationDestination(
-                  icon: Icon(t.$3),
-                  selectedIcon: Icon(t.$2),
-                  label: t.$1,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

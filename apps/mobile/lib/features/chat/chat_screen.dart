@@ -360,12 +360,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: connState == AppConnectionState.online
-                    ? const Color(0xFFD4AF37)
+                    ? const Color(0xFF4A90E2)
                     : Colors.grey,
                 boxShadow: connState == AppConnectionState.online
                     ? [
                         BoxShadow(
-                          color: const Color(0xFFD4AF37).withValues(alpha: 0.5),
+                          color: const Color(0xFF4A90E2).withValues(alpha: 0.5),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -373,11 +373,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     : null,
               ),
             ),
-            const Text('AURA'),
+            const Text('AURA', style: TextStyle(color: Color(0xFF1A237E))),
             Text(
               '  Stylist',
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
+                color: const Color(0xFF1A237E).withValues(alpha: 0.6),
                 fontSize: 14,
                 fontWeight: FontWeight.w300,
               ),
@@ -386,7 +386,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.history, color: Color(0xFFD4AF37)),
+            icon: const Icon(Icons.history, color: Color(0xFF4A90E2)),
             onPressed: () async {
               final selectedSessionId = await Navigator.push(
                 context,
@@ -402,7 +402,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             },
           ),
           IconButton(
-            icon: const Icon(Icons.add_comment, color: Color(0xFFD4AF37)),
+            icon: const Icon(Icons.add_comment, color: Color(0xFF4A90E2)),
             onPressed: () {
               setState(() {
                 _voiceSessionId = const Uuid().v4();
@@ -710,7 +710,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       child: Text(
         text,
         style: const TextStyle(
-          color: Color(0xFFD4AF37),
+          color: Color(0xFF4A90E2),
           fontSize: 14,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.3,
@@ -765,7 +765,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     Text(
                       'Listening...',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
+                        color: const Color(0xFF1A237E),
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
@@ -774,7 +774,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     Text(
                       'Speak naturally in any language • Tap mic to send',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: const Color(0xFF1A237E).withValues(alpha: 0.6),
                         fontSize: 11,
                       ),
                     ),
@@ -820,7 +820,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           Text(
             'AURA is speaking...',
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
+              color: const Color(0xFF1A237E),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
@@ -852,11 +852,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF8B1538), Color(0xFF4A148C)],
+                colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF8B1538).withValues(alpha: 0.4),
+                  color: const Color(0xFF4A90E2).withValues(alpha: 0.4),
                   blurRadius: 24,
                   spreadRadius: 2,
                 ),
@@ -889,27 +889,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               borderRadius: BorderRadius.circular(24),
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF8B1538).withValues(alpha: 0.3),
-                  const Color(0xFF4A148C).withValues(alpha: 0.2),
+                  const Color(0xFF4A90E2).withValues(alpha: 0.15),
+                  const Color(0xFF1976D2).withValues(alpha: 0.1),
                 ],
               ),
-              border: Border.all(color: const Color(0xFF8B1538).withValues(alpha: 0.4)),
+              border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.mic_rounded, color: const Color(0xFFD4AF37).withValues(alpha: 0.9), size: 22),
+                Icon(Icons.mic_rounded, color: const Color(0xFF4A90E2).withValues(alpha: 0.9), size: 22),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Tap the mic to talk',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14, fontWeight: FontWeight.w600),
+                      style: TextStyle(color: const Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                     Text(
                       'Telugu • Hindi • English • Tinglish',
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+                      style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11),
                     ),
                   ],
                 ),
@@ -944,13 +944,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
-          color: Colors.white.withValues(alpha: 0.06),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+          color: Color(0xFF4A90E2).withValues(alpha: 0.2),
+          border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.2)),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
+            color: const Color(0xFF1A237E).withValues(alpha: 0.7),
             fontSize: 13,
           ),
         ),
@@ -980,12 +980,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF8B1538), Color(0xFF4A148C)],
+                  colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
                 ),
                 boxShadow: [
                   BoxShadow(
                     color:
-                        const Color(0xFF8B1538).withValues(alpha: 0.3),
+                        const Color(0xFF4A90E2).withValues(alpha: 0.15),
                     blurRadius: 8,
                   ),
                 ],
@@ -1032,7 +1032,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
-                colors: [Color(0xFF8B1538), Color(0xFF4A148C)],
+                colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
               ),
             ),
             child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
@@ -1057,7 +1057,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                         margin: EdgeInsets.only(right: i < 2 ? 5 : 0),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: const Color(0xFFD4AF37)
+                          color: const Color(0xFF4A90E2)
                               .withValues(alpha: 0.4 + 0.4 * (1 - t)),
                         ),
                       ),
@@ -1076,9 +1076,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF121218).withValues(alpha: 0.9),
+        color: const Colors.white.withValues(alpha: 0.9),
         border: Border(
-          top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          top: BorderSide(color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
         ),
       ),
       child: SafeArea(
@@ -1091,8 +1091,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             Expanded(
               child: TextField(
                 controller: _controller,
-                style: const TextStyle(color: Colors.white, fontSize: 14.5),
+                style: const TextStyle(color: Color(0xFF1A237E), fontSize: 14.5),
                 decoration: InputDecoration(
+                  hintStyle: const TextStyle(color: Colors.black54),
                   hintText: _isRecording
                       ? 'Recording...'
                       : 'Type or tap mic to speak…',
@@ -1106,12 +1107,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             Container(
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF8B1538), Color(0xFF6A0F2B)],
+                  colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF8B1538).withValues(alpha: 0.4),
+                    color: const Color(0xFF4A90E2).withValues(alpha: 0.4),
                     blurRadius: 12,
                     offset: const Offset(0, 3),
                   ),
@@ -1147,13 +1148,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       ],
                     )
                   : const LinearGradient(
-                      colors: [Color(0xFFD4AF37), Color(0xFFB8860B)],
+                      colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
                     ),
               boxShadow: [
                 BoxShadow(
                   color: _isRecording
                       ? Colors.red.withValues(alpha: 0.4 + 0.2 * _pulseCtrl.value)
-                      : const Color(0xFFD4AF37).withValues(alpha: 0.3),
+                      : const Color(0xFF4A90E2).withValues(alpha: 0.3),
                   blurRadius: _isRecording ? 16 + 4 * _pulseCtrl.value : 12,
                   spreadRadius: _isRecording ? 2 : 1,
                 ),
@@ -1217,7 +1218,7 @@ class _ExpandableReasoningCardState extends State<_ExpandableReasoningCard> {
                   Text(
                     _expanded ? 'Hide AI Reasoning' : 'See AI Reasoning',
                     style: const TextStyle(
-                      color: Color(0xFFD4AF37),
+                      color: Color(0xFF4A90E2),
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                     ),
