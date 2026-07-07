@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -79,7 +77,8 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 90, height: 90,
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(colors: [
@@ -87,16 +86,23 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                   Colors.white,
                 ]),
               ),
-              child: const Icon(Icons.brush, size: 40, color: Color(0xFFD4AF37)),
+              child:
+                  const Icon(Icons.brush, size: 40, color: Color(0xFFD4AF37)),
             ),
             const SizedBox(height: 20),
             const Text('No designs yet',
-                style: TextStyle(color: Color(0xFF1A237E), fontSize: 18, fontWeight: FontWeight.w600)),
+                style: TextStyle(
+                    color: Color(0xFF1A237E),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             Text(
               'Start a conversation in the Chat tab.\nDescribe your dream outfit, and the AI will design it for you with measurements and shopping links.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 13, height: 1.5),
+              style: TextStyle(
+                  color: Color(0xFF1A237E).withValues(alpha: 0.5),
+                  fontSize: 13,
+                  height: 1.5),
             ),
             const SizedBox(height: 24),
             Container(
@@ -108,7 +114,8 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.auto_awesome, color: Color(0xFF1A237E), size: 18),
+                  const Icon(Icons.auto_awesome,
+                      color: Color(0xFF1A237E), size: 18),
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
@@ -118,14 +125,18 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                         // Use a simple approach — just show a hint
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('💡 Switch to the Chat tab to start designing!'),
+                            content: Text(
+                                '💡 Switch to the Chat tab to start designing!'),
                             backgroundColor: Color(0xFF8B1538),
                           ),
                         );
                       }
                     },
                     child: const Text('Go to Chat',
-                        style: TextStyle(color: Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: Color(0xFF1A237E),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600)),
                   ),
                 ],
               ),
@@ -169,7 +180,8 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
             Colors.white,
           ],
         ),
-        border: Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.2)),
+        border:
+            Border.all(color: const Color(0xFFD4AF37).withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -180,12 +192,14 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
             Row(
               children: [
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
                     color: Colors.white,
                   ),
-                  child: const Icon(Icons.brush, color: Color(0xFF1A237E), size: 22),
+                  child: const Icon(Icons.brush,
+                      color: Color(0xFF1A237E), size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -193,22 +207,31 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(name,
-                          style: const TextStyle(color: Color(0xFF1A237E), fontSize: 15, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(
+                              color: Color(0xFF1A237E),
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600)),
                       if (dateStr.isNotEmpty)
                         Text(dateStr,
-                            style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.4), fontSize: 11)),
+                            style: TextStyle(
+                                color: Color(0xFF1A237E).withValues(alpha: 0.4),
+                                fontSize: 11)),
                     ],
                   ),
                 ),
                 if (tailoring != null)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
                       color: Colors.white,
                     ),
                     child: const Text('Tailored',
-                        style: TextStyle(color: Color(0xFF1A237E), fontSize: 10, fontWeight: FontWeight.w600)),
+                        style: TextStyle(
+                            color: Color(0xFF1A237E),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600)),
                   ),
               ],
             ),
@@ -266,11 +289,17 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
           const SizedBox(width: 6),
           if (fabricReq != null)
             Text('${fabricReq['total_meters']}m fabric',
-                style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11)),
+                style: TextStyle(
+                    color: Color(0xFF1A237E).withValues(alpha: 0.6),
+                    fontSize: 11)),
           if (cut != null) ...[
-            Text(' • ', style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.3))),
+            Text(' • ',
+                style:
+                    TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.3))),
             Text('Chest: ${cut['chest_cut_cm']}cm',
-                style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11)),
+                style: TextStyle(
+                    color: Color(0xFF1A237E).withValues(alpha: 0.6),
+                    fontSize: 11)),
           ],
         ],
       ),
@@ -286,7 +315,8 @@ class _DesignScreenState extends ConsumerState<DesignScreen> {
         border: Border.all(color: Color(0xFF1A237E).withValues(alpha: 0.08)),
       ),
       child: Text(text,
-          style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.75), fontSize: 12)),
+          style: TextStyle(
+              color: Color(0xFF1A237E).withValues(alpha: 0.75), fontSize: 12)),
     );
   }
 }

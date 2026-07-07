@@ -42,7 +42,8 @@ class ApiClient {
     return data;
   }
 
-  Future<Map<String, dynamic>> login({required String email, required String password}) async {
+  Future<Map<String, dynamic>> login(
+      {required String email, required String password}) async {
     final resp = await _dio.post('/api/v1/auth/login', data: {
       'email': email,
       'password': password,
@@ -54,8 +55,8 @@ class ApiClient {
   }
 
   Future<Map<String, dynamic>> signup({
-    required String email, 
-    required String password, 
+    required String email,
+    required String password,
     required String displayName,
     String? gender,
     String? profilePhotoB64,
@@ -161,12 +162,14 @@ class ApiClient {
     final resp = await _dio.post('/api/v1/tailor/guide', data: {
       'garment_type': garmentType,
       'fabric': fabric,
-      'measurements': measurements ?? {'chest_cm': 88, 'waist_cm': 72, 'hip_cm': 96},
+      'measurements':
+          measurements ?? {'chest_cm': 88, 'waist_cm': 72, 'hip_cm': 96},
     });
     return resp.data as Map<String, dynamic>;
   }
 
-  Future<void> styleFeedback({required bool liked, List<String> tags = const []}) async {
+  Future<void> styleFeedback(
+      {required bool liked, List<String> tags = const []}) async {
     await _dio.post('/api/v1/feedback/style', data: {
       'liked': liked,
       'tags': tags,
@@ -214,7 +217,7 @@ class ApiClient {
   Future<Map<String, dynamic>> voiceConverse({
     required String audioPath,
     required String sessionId,
-    String language = '',  // empty = auto-detect
+    String language = '', // empty = auto-detect
   }) async {
     final form = FormData.fromMap({
       'audio': await MultipartFile.fromFile(audioPath, filename: 'audio.wav'),
@@ -253,7 +256,8 @@ class ApiClient {
 
   /// Get voice history for a session
   Future<List<dynamic>> getVoiceHistory(String sessionId) async {
-    final resp = await _dio.get('/api/v1/voice/converse/history', queryParameters: {
+    final resp =
+        await _dio.get('/api/v1/voice/converse/history', queryParameters: {
       'session_id': sessionId,
     });
     return (resp.data['history'] as List?) ?? [];

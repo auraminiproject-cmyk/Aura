@@ -47,10 +47,10 @@ class _AuraBackgroundState extends State<AuraBackground>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFFE3F2FD),  // Light icy blue
-                Color(0xFFBBDEFB),  // Soft blue
-                Color(0xFF90CAF9),  // Light blue
-                Color(0xFFE3F2FD),  // Back to light blue
+                Color(0xFFE3F2FD), // Light icy blue
+                Color(0xFFBBDEFB), // Soft blue
+                Color(0xFF90CAF9), // Light blue
+                Color(0xFFE3F2FD), // Back to light blue
               ],
               stops: [0.0, 0.35, 0.7, 1.0],
             ),
@@ -181,7 +181,8 @@ class _WireMeshPainter extends CustomPainter {
     for (final node in _nodes) {
       final t = progress * 2 * pi;
       final x = (node.baseX + sin(t + node.phase) * node.speedX) * size.width;
-      final y = (node.baseY + cos(t * 0.7 + node.phase) * node.speedY) * size.height;
+      final y =
+          (node.baseY + cos(t * 0.7 + node.phase) * node.speedY) * size.height;
       positions.add(Offset(x.clamp(0, size.width), y.clamp(0, size.height)));
     }
 
@@ -234,6 +235,160 @@ class AuraTheme {
   static const _surfaceCard = Color(0xFFFFFFFF);
   static const _textPrimary = Color(0xFF1A237E);
   static const _textSecondary = Color(0xFF5C6BC0);
+
+  static const _surfaceDark = Color(0xFF0F172A);
+  static const _surfaceCardDark = Color(0xFF1E293B);
+  static const _textPrimaryDark = Color(0xFFF1F5F9);
+  static const _textSecondaryDark = Color(0xFF94A3B8);
+
+  static ThemeData get darkTheme {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.transparent,
+      colorScheme: ColorScheme.dark(
+        primary: _brandBlue,
+        secondary: _brandBlue,
+        surface: _surfaceDark,
+        onSurface: _textPrimaryDark,
+        onPrimary: Colors.white,
+        primaryContainer: _brandBlue.withValues(alpha: 0.2),
+        secondaryContainer: _brandBlue.withValues(alpha: 0.1),
+      ),
+      textTheme: const TextTheme(
+        displayLarge: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+            color: _textPrimaryDark),
+        displayMedium: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+            color: _textPrimaryDark),
+        displaySmall: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.bold,
+            color: _textPrimaryDark),
+        headlineLarge: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w700,
+            color: _textPrimaryDark),
+        headlineMedium: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w600,
+            color: _textPrimaryDark),
+        headlineSmall: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w600,
+            color: _textPrimaryDark),
+        titleLarge: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w600,
+            color: _textPrimaryDark),
+        titleMedium: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w500,
+            color: _textPrimaryDark),
+        titleSmall: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w500,
+            color: _textPrimaryDark),
+        bodyLarge: TextStyle(fontFamily: 'Outfit', color: _textSecondaryDark),
+        bodyMedium: TextStyle(fontFamily: 'Outfit', color: _textSecondaryDark),
+        bodySmall: TextStyle(fontFamily: 'Outfit', color: _textSecondaryDark),
+        labelLarge: TextStyle(
+            fontFamily: 'Outfit',
+            fontWeight: FontWeight.w600,
+            color: _textPrimaryDark),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Outfit',
+          fontWeight: FontWeight.w600,
+          fontSize: 20,
+          color: _textPrimaryDark,
+        ),
+        iconTheme:
+            IconThemeData(color: _textPrimaryDark.withValues(alpha: 0.8)),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: _surfaceDark.withValues(alpha: 0.9),
+        indicatorColor: _brandBlue.withValues(alpha: 0.2),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: _brandBlue);
+          }
+          return TextStyle(
+              fontFamily: 'Outfit',
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: _textSecondaryDark.withValues(alpha: 0.8));
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: _brandBlue, size: 24);
+          }
+          return IconThemeData(
+              color: _textSecondaryDark.withValues(alpha: 0.6), size: 22);
+        }),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: _surfaceCardDark,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: _brandBlue.withValues(alpha: 0.1)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: _brandBlue.withValues(alpha: 0.1)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: _brandBlue, width: 2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        labelStyle: TextStyle(color: _textSecondaryDark.withValues(alpha: 0.8)),
+        hintStyle: TextStyle(color: _textSecondaryDark.withValues(alpha: 0.5)),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: _brandBlue,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: _brandBlue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(
+              fontFamily: 'Outfit', fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: _surfaceCardDark,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: _brandBlue.withValues(alpha: 0.05)),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: _brandBlue.withValues(alpha: 0.05),
+        thickness: 1,
+        space: 24,
+      ),
+    );
+  }
 
   static ThemeData get lightTheme {
     return ThemeData(
@@ -293,13 +448,15 @@ class AuraTheme {
         backgroundColor: _surfaceCard.withValues(alpha: 0.95),
         indicatorColor: _brandBlue.withValues(alpha: 0.15),
         labelTextStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500),
+          TextStyle(
+              fontSize: 11, color: _textSecondary, fontWeight: FontWeight.w500),
         ),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return const IconThemeData(color: _brandBlue, size: 24);
           }
-          return IconThemeData(color: _textSecondary.withValues(alpha: 0.6), size: 22);
+          return IconThemeData(
+              color: _textSecondary.withValues(alpha: 0.6), size: 22);
         }),
         elevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -319,12 +476,15 @@ class AuraTheme {
           borderRadius: BorderRadius.circular(24),
           borderSide: const BorderSide(color: _brandBlue, width: 1.5),
         ),
-        hintStyle: TextStyle(color: _textSecondary.withValues(alpha: 0.5), fontSize: 14),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        hintStyle: TextStyle(
+            color: _textSecondary.withValues(alpha: 0.5), fontSize: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: ButtonStyle(
-          foregroundColor: WidgetStatePropertyAll(_textPrimary.withValues(alpha: 0.8)),
+          foregroundColor:
+              WidgetStatePropertyAll(_textPrimary.withValues(alpha: 0.8)),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -351,51 +511,58 @@ class AuraTheme {
   }
 
   // Glassmorphic card decoration
-  static BoxDecoration get glassCard => BoxDecoration(
-        color: _surfaceCard.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: _brandBlue.withValues(alpha: 0.15),
+  static BoxDecoration glassCard(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return BoxDecoration(
+      color: (isDark ? _surfaceCardDark : _surfaceCard).withValues(alpha: 0.85),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: _brandBlue.withValues(alpha: 0.15),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: _brandBlue.withValues(alpha: 0.05),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: _brandBlue.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      );
+      ],
+    );
+  }
 
   // Gradient for chat bubbles (assistant)
-  static BoxDecoration get assistantBubble => BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            _surfaceCard.withValues(alpha: 0.9),
-            _surfaceCard,
-          ],
-        ),
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-          bottomLeft: Radius.circular(4),
-          bottomRight: Radius.circular(20),
-        ),
-        border: Border.all(
-          color: _brandBlue.withValues(alpha: 0.15),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: _brandBlue.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+  static BoxDecoration assistantBubble(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? _surfaceCardDark : _surfaceCard;
+    return BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          cardColor.withValues(alpha: 0.9),
+          cardColor,
         ],
-      );
+      ),
+      borderRadius: const BorderRadius.only(
+        topLeft: Radius.circular(20),
+        topRight: Radius.circular(20),
+        bottomLeft: Radius.circular(4),
+        bottomRight: Radius.circular(20),
+      ),
+      border: Border.all(
+        color: _brandBlue.withValues(alpha: 0.15),
+      ),
+      boxShadow: [
+        BoxShadow(
+          color: _brandBlue.withValues(alpha: 0.05),
+          blurRadius: 8,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    );
+  }
 
   // Gradient for chat bubbles (user)
-  static BoxDecoration get userBubble => BoxDecoration(
+  static BoxDecoration userBubble(BuildContext context) => BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

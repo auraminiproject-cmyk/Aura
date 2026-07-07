@@ -55,7 +55,8 @@ class _ProductResultsScreenState extends ConsumerState<ProductResultsScreen> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
-        title: const Text('Shop', style: TextStyle(fontWeight: FontWeight.bold)),
+        title:
+            const Text('Shop', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
       ),
       body: Column(
@@ -240,8 +241,7 @@ class _ProductResultsScreenState extends ConsumerState<ProductResultsScreen> {
                             ),
                             child: Text(platform,
                                 style: TextStyle(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.5),
+                                    color: Colors.white.withValues(alpha: 0.5),
                                     fontSize: 11)),
                           ),
                         ],
@@ -260,8 +260,7 @@ class _ProductResultsScreenState extends ConsumerState<ProductResultsScreen> {
                 ),
                 // Arrow
                 Icon(Icons.open_in_new,
-                    size: 16,
-                    color: Colors.white.withValues(alpha: 0.3)),
+                    size: 16, color: Colors.white.withValues(alpha: 0.3)),
               ],
             ),
           ),

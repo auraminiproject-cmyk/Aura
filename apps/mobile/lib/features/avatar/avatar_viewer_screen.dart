@@ -8,7 +8,8 @@ class AvatarViewerScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final src = glbUrl ?? 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
+    final src =
+        glbUrl ?? 'https://modelviewer.dev/shared-assets/models/Astronaut.glb';
     return Scaffold(
       appBar: AppBar(title: const Text('3D Avatar')),
       body: ModelViewer(

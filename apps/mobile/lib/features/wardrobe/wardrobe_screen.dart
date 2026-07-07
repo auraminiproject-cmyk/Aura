@@ -43,7 +43,8 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         title: const Text('My Wardrobe',
-            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
+            style: TextStyle(
+                fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
         centerTitle: true,
         actions: [
           IconButton(
@@ -83,7 +84,8 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
           const SizedBox(height: 16),
           Text('No saved outfits yet',
               style: TextStyle(
-                  color: Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 17)),
+                  color: Color(0xFF1A237E).withValues(alpha: 0.8),
+                  fontSize: 17)),
           const SizedBox(height: 8),
           Text(
             'Finalize an outfit in Chat to save it here',
@@ -133,8 +135,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
             Color(0xFFF5F9FF),
           ],
         ),
-        border: Border.all(
-            color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
+        border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -175,8 +176,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                   ),
                 ),
                 // Badges
-                if (hasTryon)
-                  _badge('Try-On', const Color(0xFF4A90E2)),
+                if (hasTryon) _badge('Try-On', const Color(0xFF4A90E2)),
                 if (tailoring != null) ...[
                   const SizedBox(width: 6),
                   _badge('Tailored', const Color(0xFF1B5E20)),
@@ -202,8 +202,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
             ),
 
           // Tailoring summary
-          if (tailoring != null)
-            _buildTailoringSummary(tailoring),
+          if (tailoring != null) _buildTailoringSummary(tailoring),
 
           const SizedBox(height: 8),
         ],
@@ -222,16 +221,14 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           color: Colors.green.shade50,
-          border: Border.all(
-              color: Color(0xFF66BB6A).withValues(alpha: 0.2)),
+          border: Border.all(color: Color(0xFF66BB6A).withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.straighten,
-                    color: Colors.green.shade300, size: 14),
+                Icon(Icons.straighten, color: Colors.green.shade300, size: 14),
                 const SizedBox(width: 6),
                 Text('Tailoring',
                     style: TextStyle(
@@ -262,9 +259,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   'Fabric: ${fabricReq['total_meters']}m needed',
-                  style: TextStyle(
-                      color: Colors.green.shade800,
-                      fontSize: 11),
+                  style: TextStyle(color: Colors.green.shade800, fontSize: 11),
                 ),
               ),
           ],
@@ -300,7 +295,8 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
           const SizedBox(width: 4),
           Text(text,
               style: TextStyle(
-                  color: Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 11)),
+                  color: Color(0xFF1A237E).withValues(alpha: 0.8),
+                  fontSize: 11)),
         ],
       ),
     );

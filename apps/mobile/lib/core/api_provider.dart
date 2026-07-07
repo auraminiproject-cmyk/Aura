@@ -101,14 +101,15 @@ Future<String?> performAuth(
         password: password,
       );
     }
-    
+
     final token = data['access_token'] as String;
     final refreshToken = data['refresh_token'] as String?;
     final userId = data['user_id'] as String;
 
     // Cache for persistence across app restarts
     await prefs.setString(_kAccessToken, token);
-    if (refreshToken != null) await prefs.setString(_kRefreshToken, refreshToken);
+    if (refreshToken != null)
+      await prefs.setString(_kRefreshToken, refreshToken);
     await prefs.setString(_kUserId, userId);
     if (displayName != null) await prefs.setString(_kDisplayName, displayName);
 
@@ -118,10 +119,13 @@ Future<String?> performAuth(
     return null; // success
   } on DioException catch (e) {
     connState.state = AppConnectionState.offline;
-    if (e.response != null && e.response!.data is Map && e.response!.data['detail'] != null) {
+    if (e.response != null &&
+        e.response!.data is Map &&
+        e.response!.data['detail'] != null) {
       final detail = e.response!.data['detail'];
       if (detail is String) return detail;
-      if (detail is List && detail.isNotEmpty) return detail[0]['msg']?.toString() ?? 'Validation error';
+      if (detail is List && detail.isNotEmpty)
+        return detail[0]['msg']?.toString() ?? 'Validation error';
     }
     return 'Authentication failed. Please check credentials or internet.';
   } catch (_) {
@@ -129,4 +133,3 @@ Future<String?> performAuth(
     return 'An unexpected error occurred.';
   }
 }
-

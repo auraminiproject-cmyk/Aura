@@ -9,7 +9,8 @@ class WebSocketChat {
 
   void connect(String sessionId) {
     final base = AppConfig.apiBaseUrl.replaceFirst('http', 'ws');
-    _channel = WebSocketChannel.connect(Uri.parse('$base/api/v1/chat/ws/$sessionId'));
+    _channel =
+        WebSocketChannel.connect(Uri.parse('$base/api/v1/chat/ws/$sessionId'));
   }
 
   Stream<dynamic> get stream => _channel!.stream;

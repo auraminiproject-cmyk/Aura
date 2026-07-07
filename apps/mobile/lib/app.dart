@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/aura_background.dart';
+import 'core/theme_provider.dart';
 import 'core/api_provider.dart';
 import 'features/auth/auth_screen.dart';
 import 'features/home/home_screen.dart';
@@ -14,19 +15,24 @@ class FashionAiApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Force dark status bar icons on light background
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark;
+
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Color(0xFFF5F9FF),
-      systemNavigationBarIconBrightness: Brightness.dark,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor:
+          isDark ? const Color(0xFF0F172A) : const Color(0xFFF5F9FF),
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
     ));
 
     return MaterialApp(
       title: 'AURA Fashion AI',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.light,
+      themeMode: themeMode,
       theme: AuraTheme.lightTheme,
+      darkTheme: AuraTheme.darkTheme,
       localizationsDelegates: [
         FlutterI18nDelegate(
           translationLoader: FileTranslationLoader(
@@ -92,4 +98,3 @@ class _AuthGateState extends ConsumerState<_AuthGate> {
     );
   }
 }
-

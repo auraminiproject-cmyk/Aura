@@ -100,7 +100,9 @@ class AppDatabase extends _$AppDatabase {
   Future<List<CachedProduct>> searchCachedProducts(String query) {
     final lower = query.toLowerCase();
     return (select(cachedProducts)
-          ..where((t) => t.name.lower().contains(lower) | t.category.lower().contains(lower)))
+          ..where((t) =>
+              t.name.lower().contains(lower) |
+              t.category.lower().contains(lower)))
         .get();
   }
 

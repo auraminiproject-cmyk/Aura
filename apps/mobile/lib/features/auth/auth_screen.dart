@@ -159,7 +159,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                 // Title
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
-                    colors: [Color(0xFF4A90E2), Color(0xFF2196F3), Color(0xFF4A90E2)],
+                    colors: [
+                      Color(0xFF4A90E2),
+                      Color(0xFF2196F3),
+                      Color(0xFF4A90E2)
+                    ],
                   ).createShader(bounds),
                   child: const Text(
                     'AURA',
@@ -194,7 +198,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   child: TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
+                    style:
+                        const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Email address',
                       hintStyle: TextStyle(
@@ -227,7 +232,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   child: TextField(
                     controller: _passwordController,
                     obscureText: true,
-                    style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
+                    style:
+                        const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
                     decoration: InputDecoration(
                       hintText: 'Password',
                       hintStyle: TextStyle(
@@ -244,7 +250,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         vertical: 16,
                       ),
                     ),
-                    textInputAction: _isSignup ? TextInputAction.next : TextInputAction.done,
+                    textInputAction:
+                        _isSignup ? TextInputAction.next : TextInputAction.done,
                     onSubmitted: _isSignup ? null : (_) => _submit(),
                   ),
                 ),
@@ -261,7 +268,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                     ),
                     child: TextField(
                       controller: _nameController,
-                      style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
+                      style: const TextStyle(
+                          color: Color(0xFF1A237E), fontSize: 16),
                       decoration: InputDecoration(
                         hintText: 'Your name (optional)',
                         hintStyle: TextStyle(
@@ -298,9 +306,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         value: _gender,
                         dropdownColor: Colors.white,
                         isExpanded: true,
-                        icon: Icon(Icons.arrow_drop_down, color: const Color(0xFF1A237E).withValues(alpha: 0.4)),
-                        style: const TextStyle(color: Color(0xFF1A237E), fontSize: 16),
-                        items: ['Neutral', 'Masculine', 'Feminine'].map((String value) {
+                        icon: Icon(Icons.arrow_drop_down,
+                            color:
+                                const Color(0xFF1A237E).withValues(alpha: 0.4)),
+                        style: const TextStyle(
+                            color: Color(0xFF1A237E), fontSize: 16),
+                        items: ['Neutral', 'Masculine', 'Feminine']
+                            .map((String value) {
                           return DropdownMenuItem<String>(
                             value: value,
                             child: Text(value),
@@ -332,20 +344,27 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                         children: [
                           Icon(
                             Icons.photo_camera_outlined,
-                            color: const Color(0xFF1A237E).withValues(alpha: 0.4),
+                            color:
+                                const Color(0xFF1A237E).withValues(alpha: 0.4),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Text(
-                              _profilePhoto != null ? 'Photo selected' : 'Upload profile photo (optional)',
+                              _profilePhoto != null
+                                  ? 'Photo selected'
+                                  : 'Upload profile photo (optional)',
                               style: TextStyle(
-                                color: _profilePhoto != null ? const Color(0xFF1A237E) : const Color(0xFF1A237E).withValues(alpha: 0.3),
+                                color: _profilePhoto != null
+                                    ? const Color(0xFF1A237E)
+                                    : const Color(0xFF1A237E)
+                                        .withValues(alpha: 0.3),
                                 fontSize: 16,
                               ),
                             ),
                           ),
                           if (_profilePhoto != null)
-                            const Icon(Icons.check_circle, color: Color(0xFF4A90E2)),
+                            const Icon(Icons.check_circle,
+                                color: Color(0xFF4A90E2)),
                         ],
                       ),
                     ),

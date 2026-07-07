@@ -55,7 +55,8 @@ class HomeScreen extends ConsumerWidget {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (_) => const WardrobeScreen()),
+                        MaterialPageRoute(
+                            builder: (_) => const WardrobeScreen()),
                       );
                     },
                   ),
@@ -112,7 +113,7 @@ class _DashboardCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        decoration: AuraTheme.glassCard,
+        decoration: AuraTheme.glassCard(context),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

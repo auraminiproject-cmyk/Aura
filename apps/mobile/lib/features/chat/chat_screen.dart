@@ -54,7 +54,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..repeat(reverse: true);
-    
+
     _loadHistory();
   }
 
@@ -143,8 +143,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (outfitState != null) {
         final stage = outfitState['stage'] as String? ?? '';
         if (stage == 'finalized') {
-          _addMessage('assistant',
-              '✅ Outfit finalized! Generating your design...');
+          _addMessage(
+              'assistant', '✅ Outfit finalized! Generating your design...');
           await _triggerFinalize(api);
         }
       }
@@ -168,7 +168,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     }
   }
 
-  void _addMessage(String role, String text, {String? imageB64, List<Map<String, dynamic>>? products, Map<String, dynamic>? tailoring, Map<String, dynamic>? spec}) {
+  void _addMessage(String role, String text,
+      {String? imageB64,
+      List<Map<String, dynamic>>? products,
+      Map<String, dynamic>? tailoring,
+      Map<String, dynamic>? spec}) {
     setState(() {
       _messages.add({
         'role': role,
@@ -206,7 +210,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       }
 
       final dir = await getTemporaryDirectory();
-      _recordingPath = p.join(dir.path, 'aura_voice_${DateTime.now().millisecondsSinceEpoch}.wav');
+      _recordingPath = p.join(
+          dir.path, 'aura_voice_${DateTime.now().millisecondsSinceEpoch}.wav');
 
       const config = RecordConfig(
         encoder: AudioEncoder.wav,
@@ -238,7 +243,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       if (!await file.exists()) return;
       final fileSize = await file.length();
       if (fileSize < 100) {
-        _addMessage('assistant', '🎤 Recording too short. Try speaking a bit longer.');
+        _addMessage(
+            'assistant', '🎤 Recording too short. Try speaking a bit longer.');
         return;
       }
 
@@ -266,10 +272,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         final detectedLang = resp['detected_language'] as String? ?? '';
         final asrEngine = resp['asr_engine'] as String? ?? '';
         final ttsEngine = resp['tts_engine'] as String? ?? '';
-        debugPrint('[voice] ASR=$asrEngine, TTS=$ttsEngine, lang=$detectedLang');
+        debugPrint(
+            '[voice] ASR=$asrEngine, TTS=$ttsEngine, lang=$detectedLang');
 
         // Replace the "voice message sent" with actual transcript
-        if (_messages.isNotEmpty && _messages.last['text'] == '🎤 Voice message sent') {
+        if (_messages.isNotEmpty &&
+            _messages.last['text'] == '🎤 Voice message sent') {
           setState(() {
             _messages.last['text'] = '🎤 "$transcript"';
           });
@@ -282,8 +290,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         if (outfitState != null) {
           final stage = outfitState['stage'] as String? ?? '';
           if (stage == 'finalized') {
-            _addMessage('assistant',
-                '✅ Outfit finalized! Generating your design...');
+            _addMessage(
+                'assistant', '✅ Outfit finalized! Generating your design...');
             await _triggerFinalize(api);
           }
         }
@@ -307,7 +315,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       }
 
       // Cleanup temp file
-      try { await file.delete(); } catch (_) {}
+      try {
+        await file.delete();
+      } catch (_) {}
     } catch (e) {
       setState(() => _isRecording = false);
       debugPrint('Recording stop/send failed: $e');
@@ -323,7 +333,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       setState(() => _isPlayingResponse = true);
       final audioBytes = base64Decode(audioB64);
       final dir = await getTemporaryDirectory();
-      final audioFile = File(p.join(dir.path, 'aura_reply_${DateTime.now().millisecondsSinceEpoch}.wav'));
+      final audioFile = File(p.join(
+          dir.path, 'aura_reply_${DateTime.now().millisecondsSinceEpoch}.wav'));
       await audioFile.writeAsBytes(audioBytes);
       await _audioPlayer.play(DeviceFileSource(audioFile.path));
 
@@ -333,7 +344,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           setState(() => _isPlayingResponse = false);
         }
         // Clean up temp file
-        try { audioFile.deleteSync(); } catch (_) {}
+        try {
+          audioFile.deleteSync();
+        } catch (_) {}
       });
     } catch (e) {
       debugPrint('Audio playback failed: $e');
@@ -392,7 +405,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 context,
                 MaterialPageRoute(builder: (ctx) => const ChatHistoryScreen()),
               );
-              if (selectedSessionId != null && selectedSessionId is String && selectedSessionId != _voiceSessionId) {
+              if (selectedSessionId != null &&
+                  selectedSessionId is String &&
+                  selectedSessionId != _voiceSessionId) {
                 setState(() {
                   _voiceSessionId = selectedSessionId;
                   _messages.clear();
@@ -438,6 +453,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ),
     );
   }
+
   // ── Finalize trigger — calls API and shows rich results ─────────
   Future<void> _triggerFinalize(dynamic api) async {
     try {
@@ -448,12 +464,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final imageUrl = result['image_url'] as String?;
       if (outfitB64 != null && outfitB64.isNotEmpty) {
         setState(() {
-          _messages.add(<String, String>{'role': 'result', 'type': 'image_b64', 'data': outfitB64});
+          _messages.add(<String, String>{
+            'role': 'result',
+            'type': 'image_b64',
+            'data': outfitB64
+          });
         });
         _scrollToBottom();
       } else if (imageUrl != null && imageUrl.isNotEmpty) {
         setState(() {
-          _messages.add(<String, String>{'role': 'result', 'type': 'image', 'url': imageUrl});
+          _messages.add(<String, String>{
+            'role': 'result',
+            'type': 'image',
+            'url': imageUrl
+          });
         });
         _scrollToBottom();
       }
@@ -462,7 +486,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       final tryonB64 = result['tryon_image_b64'] as String?;
       if (tryonB64 != null && tryonB64.isNotEmpty) {
         setState(() {
-          _messages.add(<String, String>{'role': 'result', 'type': 'tryon', 'data': tryonB64});
+          _messages.add(<String, String>{
+            'role': 'result',
+            'type': 'tryon',
+            'data': tryonB64
+          });
         });
         _scrollToBottom();
       }
@@ -488,8 +516,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             'role': 'result',
             'type': 'products',
             'text': _formatProducts(webMatches),
-            'links': webMatches.map((m) => (m as Map)['url']?.toString() ?? '').join('|'),
-            'names': webMatches.map((m) => (m as Map)['name']?.toString() ?? 'Product').join('|'),
+            'links': webMatches
+                .map((m) => (m as Map)['url']?.toString() ?? '')
+                .join('|'),
+            'names': webMatches
+                .map((m) => (m as Map)['name']?.toString() ?? 'Product')
+                .join('|'),
           });
         });
         _scrollToBottom();
@@ -498,7 +530,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       // Show reasoning (expandable)
       final reasoning = result['reasoning'] as String?;
       if (reasoning != null && reasoning.contains('<think>')) {
-        final thinkMatch = RegExp(r'<think>(.*?)</think>', dotAll: true).firstMatch(reasoning);
+        final thinkMatch =
+            RegExp(r'<think>(.*?)</think>', dotAll: true).firstMatch(reasoning);
         if (thinkMatch != null) {
           setState(() {
             _messages.add({
@@ -520,7 +553,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       _addMessage('assistant', '⚠️ $msg. Please try again.');
     } catch (e) {
       debugPrint('Finalize failed: $e');
-      _addMessage('assistant', '⚠️ Could not generate final design. Please try again.');
+      _addMessage(
+          'assistant', '⚠️ Could not generate final design. Please try again.');
     }
   }
 
@@ -577,10 +611,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       Widget imageWidget;
       if (type == 'tryon' || type == 'image_b64') {
         final bytes = base64Decode(m['data']?.toString() ?? '');
-        imageWidget = Image.memory(Uint8List.fromList(bytes), fit: BoxFit.cover);
+        imageWidget =
+            Image.memory(Uint8List.fromList(bytes), fit: BoxFit.cover);
       } else {
-        imageWidget = Image.network(m['url']?.toString() ?? '', fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.broken_image, color: Colors.white30)));
+        imageWidget = Image.network(m['url']?.toString() ?? '',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const Center(
+                child: Icon(Icons.broken_image, color: Colors.white30)));
       }
       return Padding(
         padding: const EdgeInsets.only(bottom: 12),
@@ -631,17 +668,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                       final url = links[i].trim();
                       if (url.isNotEmpty) {
                         try {
-                          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                          await launchUrl(Uri.parse(url),
+                              mode: LaunchMode.externalApplication);
                         } catch (_) {}
                       }
                     },
                     child: Row(
                       children: [
-                        const Icon(Icons.shopping_bag_outlined, color: Color(0xFF42A5F5), size: 16),
+                        const Icon(Icons.shopping_bag_outlined,
+                            color: Color(0xFF42A5F5), size: 16),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            i < names.length ? names[i].trim() : 'Product ${i + 1}',
+                            i < names.length
+                                ? names[i].trim()
+                                : 'Product ${i + 1}',
                             style: const TextStyle(
                               color: Color(0xFF90CAF9),
                               fontSize: 13,
@@ -651,7 +692,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const Icon(Icons.open_in_new, color: Color(0xFF42A5F5), size: 14),
+                        const Icon(Icons.open_in_new,
+                            color: Color(0xFF42A5F5), size: 14),
                       ],
                     ),
                   ),
@@ -734,10 +776,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 height: 12,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.red.withValues(alpha: 0.6 + 0.4 * _pulseCtrl.value),
+                  color: Colors.red
+                      .withValues(alpha: 0.6 + 0.4 * _pulseCtrl.value),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.red.withValues(alpha: 0.4 * _pulseCtrl.value),
+                      color:
+                          Colors.red.withValues(alpha: 0.4 * _pulseCtrl.value),
                       blurRadius: 8 + 4 * _pulseCtrl.value,
                       spreadRadius: 1,
                     ),
@@ -777,9 +821,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Color(0xFF1A237E).withValues(alpha: 0.2)),
+                    border: Border.all(
+                        color: Color(0xFF1A237E).withValues(alpha: 0.2)),
                   ),
-                  child: const Icon(Icons.stop_rounded, color: Color(0xFF1A237E), size: 20),
+                  child: const Icon(Icons.stop_rounded,
+                      color: Color(0xFF1A237E), size: 20),
                 ),
               ),
             ],
@@ -798,7 +844,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       ),
       child: Row(
         children: [
-          const Icon(Icons.volume_up_rounded, color: Colors.greenAccent, size: 20),
+          const Icon(Icons.volume_up_rounded,
+              color: Colors.greenAccent, size: 20),
           const SizedBox(width: 10),
           Text(
             'AURA is speaking...',
@@ -814,7 +861,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               await _audioPlayer.stop();
               setState(() => _isPlayingResponse = false);
             },
-            child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.6), size: 18),
+            child: Icon(Icons.close,
+                color: Colors.white.withValues(alpha: 0.6), size: 18),
           ),
         ],
       ),
@@ -876,23 +924,30 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   Color(0xFF1976D2).withValues(alpha: 0.1),
                 ],
               ),
-              border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.4)),
+              border:
+                  Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.mic_rounded, color: Color(0xFF4A90E2).withValues(alpha: 0.9), size: 22),
+                Icon(Icons.mic_rounded,
+                    color: Color(0xFF4A90E2).withValues(alpha: 0.9), size: 22),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       'Tap the mic to talk',
-                      style: TextStyle(color: const Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: const Color(0xFF1A237E),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600),
                     ),
                     Text(
                       'Telugu • Hindi • English • Tinglish',
-                      style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11),
+                      style: TextStyle(
+                          color: Color(0xFF1A237E).withValues(alpha: 0.6),
+                          fontSize: 11),
                     ),
                   ],
                 ),
@@ -967,13 +1022,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color:
-                        Color(0xFF4A90E2).withValues(alpha: 0.15),
+                    color: Color(0xFF4A90E2).withValues(alpha: 0.15),
                     blurRadius: 8,
                   ),
                 ],
               ),
-              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+              child:
+                  const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
             ),
           ],
           Flexible(
@@ -982,8 +1037,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               constraints: BoxConstraints(
                 maxWidth: MediaQuery.of(context).size.width * 0.75,
               ),
-              decoration: (isUser ? AuraTheme.userBubble : AuraTheme.assistantBubble).copyWith(
-                  borderRadius: BorderRadius.circular(20).copyWith(
+              decoration: (isUser
+                      ? AuraTheme.userBubble(context)
+                      : AuraTheme.assistantBubble(context))
+                  .copyWith(
+                borderRadius: BorderRadius.circular(20).copyWith(
                   bottomRight: isUser ? Radius.zero : const Radius.circular(20),
                   bottomLeft: !isUser ? Radius.zero : const Radius.circular(20),
                 ),
@@ -1018,11 +1076,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 colors: [Color(0xFF4A90E2), Color(0xFF1976D2)],
               ),
             ),
-            child: const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+            child:
+                const Icon(Icons.auto_awesome, size: 14, color: Colors.white),
           ),
           Container(
             padding: const EdgeInsets.all(14),
-            decoration: AuraTheme.assistantBubble,
+            decoration: AuraTheme.assistantBubble(context),
             child: AnimatedBuilder(
               animation: _typingCtrl,
               builder: (context, _) {
@@ -1074,7 +1133,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             Expanded(
               child: TextField(
                 controller: _controller,
-                style: const TextStyle(color: Color(0xFF1A237E), fontSize: 14.5),
+                style:
+                    const TextStyle(color: Color(0xFF1A237E), fontSize: 14.5),
                 decoration: InputDecoration(
                   hintStyle: const TextStyle(color: Colors.black54),
                   hintText: _isRecording
@@ -1136,7 +1196,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               boxShadow: [
                 BoxShadow(
                   color: _isRecording
-                      ? Colors.red.withValues(alpha: 0.4 + 0.2 * _pulseCtrl.value)
+                      ? Colors.red
+                          .withValues(alpha: 0.4 + 0.2 * _pulseCtrl.value)
                       : Color(0xFF4A90E2).withValues(alpha: 0.3),
                   blurRadius: _isRecording ? 16 + 4 * _pulseCtrl.value : 12,
                   spreadRadius: _isRecording ? 2 : 1,
@@ -1165,7 +1226,8 @@ class _ExpandableReasoningCard extends StatefulWidget {
   final String reasoning;
 
   @override
-  State<_ExpandableReasoningCard> createState() => _ExpandableReasoningCardState();
+  State<_ExpandableReasoningCard> createState() =>
+      _ExpandableReasoningCardState();
 }
 
 class _ExpandableReasoningCardState extends State<_ExpandableReasoningCard> {
