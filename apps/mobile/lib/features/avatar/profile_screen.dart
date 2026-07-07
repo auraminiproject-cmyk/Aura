@@ -57,7 +57,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _pickAndValidate(bool isFront) async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: const Colors.white,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -72,7 +72,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ListTile(
                 leading: const Icon(Icons.camera_alt, color: Color(0xFF4A90E2)),
                 title: const Text('Take Photo', style: TextStyle(color: const Color(0xFF1A237E))),
-                subtitle: Text(isFront ? 'Stand facing the camera, arms slightly away' : 'Turn 90° to your left or right', style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 12)),
+                subtitle: Text(isFront ? 'Stand facing the camera, arms slightly away' : 'Turn 90° to your left or right', style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 12)),
                 onTap: () => Navigator.pop(ctx, ImageSource.camera),
               ),
               ListTile(
@@ -154,11 +154,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          backgroundColor: const Colors.white,
+          backgroundColor: Colors.white,
           title: const Text('Image Quality Warning', style: TextStyle(color: const Color(0xFF1A237E))),
           content: Text(
             'The front photo has quality issues:\n${(_frontQuality!['issues'] as List?)?.join('\n') ?? 'Unknown'}\n\nContinue anyway? Results may be less accurate.',
-            style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.7)),
+            style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.7)),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Retake')),
@@ -250,7 +250,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
-              backgroundColor: const Colors.white,
+              backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               title: Row(
                 children: [
@@ -270,7 +270,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 children: [
                   Text(
                     'For precise tailoring measurements, please:',
-                    style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 13),
+                    style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 13),
                   ),
                   const SizedBox(height: 14),
                   _retakeTip(Icons.accessibility_new, 'Stand upright, arms slightly out'),
@@ -308,7 +308,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         children: [
           Icon(icon, color: const Color(0xFF4A90E2), size: 18),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.7), fontSize: 12))),
+          Expanded(child: Text(text, style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.7), fontSize: 12))),
         ],
       ),
     );
@@ -386,9 +386,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF4A90E2).withValues(alpha: 0.1),
+                color: Color(0xFF4A90E2).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.2)),
+                border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
@@ -414,7 +414,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           if (_statusText.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Center(child: Text(_statusText, style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.7), fontSize: 13))),
+            Center(child: Text(_statusText, style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.7), fontSize: 13))),
           ],
 
           // Results
@@ -426,9 +426,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF2E7D32).withValues(alpha: 0.15),
+                color: Color(0xFF2E7D32).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2E7D32).withValues(alpha: 0.3)),
+                border: Border.all(color: Color(0xFF2E7D32).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -455,7 +455,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             gradient: const LinearGradient(colors: [Color(0xFF4A90E2), Color(0xFF1976D2)]),
-            boxShadow: [BoxShadow(color: const Color(0xFF4A90E2).withValues(alpha: 0.4), blurRadius: 20)],
+            boxShadow: [BoxShadow(color: Color(0xFF4A90E2).withValues(alpha: 0.4), blurRadius: 20)],
           ),
           child: const Icon(Icons.straighten, color: Colors.white, size: 28),
         ),
@@ -465,7 +465,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         Text(
           'Take full-body photos for precise measurements\nused in outfit design & tailoring',
           textAlign: TextAlign.center,
-          style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 13, height: 1.4),
+          style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 13, height: 1.4),
         ),
       ],
     );
@@ -477,14 +477,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A237E),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.1)),
+        border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF4A90E2).withValues(alpha: 0.15),
+              color: Color(0xFF4A90E2).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.height, color: Color(0xFF4A90E2), size: 22),
@@ -495,7 +495,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Your Height', style: TextStyle(color: const Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('Calibration anchor for all measurements', style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.4), fontSize: 11)),
+                Text('Calibration anchor for all measurements', style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.4), fontSize: 11)),
               ],
             ),
           ),
@@ -508,10 +508,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               style: const TextStyle(color: const Color(0xFF1A237E), fontSize: 18, fontWeight: FontWeight.bold),
               decoration: InputDecoration(
                 suffixText: 'cm',
-                suffixStyle: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 12),
+                suffixStyle: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 12),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: const Color(0xFF4A90E2).withValues(alpha: 0.2))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: const Color(0xFF4A90E2).withValues(alpha: 0.2))),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Color(0xFF4A90E2).withValues(alpha: 0.2))),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Color(0xFF4A90E2).withValues(alpha: 0.2))),
                 focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFF4A90E2))),
               ),
             ),
@@ -527,14 +527,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFF1A237E),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.1)),
+        border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFF4A90E2).withValues(alpha: 0.15),
+              color: Color(0xFF4A90E2).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.person, color: Color(0xFF4A90E2), size: 22),
@@ -545,14 +545,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text('Gender', style: TextStyle(color: const Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w600)),
-                Text('For tailoring context', style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.4), fontSize: 11)),
+                Text('For tailoring context', style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.4), fontSize: 11)),
               ],
             ),
           ),
           DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedGender,
-              dropdownColor: const Colors.white,
+              dropdownColor: Colors.white,
               style: const TextStyle(color: const Color(0xFF1A237E), fontSize: 16, fontWeight: FontWeight.bold),
               icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF4A90E2)),
               items: ['Male', 'Female', 'Neutral'].map((String value) {
@@ -583,7 +583,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         gradient: canAnalyze ? const LinearGradient(colors: [Color(0xFF4A90E2), Color(0xFF1976D2)]) : null,
         color: !canAnalyze ? Colors.grey.shade300 : null,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: canAnalyze ? [BoxShadow(color: const Color(0xFF4A90E2).withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 4))] : null,
+        boxShadow: canAnalyze ? [BoxShadow(color: Color(0xFF4A90E2).withValues(alpha: 0.4), blurRadius: 16, offset: const Offset(0, 4))] : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -641,7 +641,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           colors: [Colors.white, Color(0xFFF5F9FF)],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isHighConf ? const Color(0xFF4A90E2).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1)),
+        border: Border.all(color: isHighConf ? Color(0xFF4A90E2).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,7 +668,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF4A90E2).withValues(alpha: 0.15),
+                        color: Color(0xFF4A90E2).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
@@ -723,13 +723,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFF4A90E2), width: 3),
                 boxShadow: [
-                  BoxShadow(color: const Color(0xFF4A90E2).withValues(alpha: 0.2), blurRadius: 20, spreadRadius: 2),
+                  BoxShadow(color: Color(0xFF4A90E2).withValues(alpha: 0.2), blurRadius: 20, spreadRadius: 2),
                 ],
               ),
               child: ClipOval(
                 child: b64Photo != null
                     ? Image.memory(base64Decode(b64Photo), fit: BoxFit.cover)
-                    : Container(color: const Color(0xFFF5F9FF), child: const Icon(Icons.person, size: 60, color: const Color(0xFF1A237E).withValues(alpha: 0.5))),
+                    : Container(color: const Color(0xFFF5F9FF), child: Icon(Icons.person, size: 60, color: Color(0xFF1A237E).withValues(alpha: 0.5))),
               ),
             ),
           ),
@@ -737,9 +737,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: const Colors.white,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.3)),
+              border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
@@ -748,7 +748,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 Expanded(
                   child: Text(
                     'Wired to AI Agent\nThis data is actively used to personalize your style recommendations and tailor designs.',
-                    style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 12, height: 1.4),
+                    style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 12, height: 1.4),
                   ),
                 ),
               ],
@@ -786,7 +786,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             label: const Text('Update Avatar & Measurements', style: TextStyle(color: const Color(0xFF1A237E))),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
-              side: BorderSide(color: const Color(0xFF4A90E2).withValues(alpha: 0.2)),
+              side: BorderSide(color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () => setState(() => _isRetaking = true),
@@ -803,7 +803,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 15)),
+          Text(label, style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 15)),
           Text(value, style: const TextStyle(color: const Color(0xFF1A237E), fontSize: 15, fontWeight: FontWeight.w600)),
         ],
       ),
@@ -818,7 +818,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 12)),
+          Text(label, style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 12)),
           const SizedBox(height: 4),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -878,7 +878,7 @@ class _MeasurementGrid extends StatelessWidget {
             children: [
               Text(item.value, style: const TextStyle(color: Color(0xFF4A90E2), fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 4),
-              Text(item.key, style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11), textAlign: TextAlign.center),
+              Text(item.key, style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11), textAlign: TextAlign.center),
             ],
           ),
         );
@@ -917,7 +917,7 @@ class _PhotoCard extends StatelessWidget {
             color: imagePath != null
                 ? (hasQuality
                     ? (isGoodQuality ? Colors.green.withValues(alpha: 0.5) : Colors.orange.withValues(alpha: 0.5))
-                    : const Color(0xFF4A90E2).withValues(alpha: 0.5))
+                    : Color(0xFF4A90E2).withValues(alpha: 0.5))
                 : Colors.white.withValues(alpha: 0.1),
             width: imagePath != null ? 2 : 1,
           ),
@@ -976,7 +976,7 @@ class _PhotoCard extends StatelessWidget {
               : Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(icon, size: 40, color: const Color(0xFF1A237E).withValues(alpha: 0.3)),
+                    Icon(icon, size: 40, color: Color(0xFF1A237E).withValues(alpha: 0.3)),
                     const SizedBox(height: 10),
                     Text(label, style: const TextStyle(color: const Color(0xFF1A237E), fontSize: 14, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
@@ -984,7 +984,7 @@ class _PhotoCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(8),
-                        color: required ? const Color(0xFF8B1538).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
+                        color: required ? Color(0xFF8B1538).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
                       ),
                       child: Text(sublabel, style: TextStyle(
                         color: required ? Colors.red.shade200 : Colors.white.withValues(alpha: 0.4),
@@ -992,7 +992,7 @@ class _PhotoCard extends StatelessWidget {
                       )),
                     ),
                     const SizedBox(height: 8),
-                    Icon(Icons.add_a_photo, size: 18, color: const Color(0xFF1A237E).withValues(alpha: 0.3)),
+                    Icon(Icons.add_a_photo, size: 18, color: Color(0xFF1A237E).withValues(alpha: 0.3)),
                   ],
                 ),
         ),

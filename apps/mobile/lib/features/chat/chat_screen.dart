@@ -365,7 +365,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 boxShadow: connState == AppConnectionState.online
                     ? [
                         BoxShadow(
-                          color: const Color(0xFF4A90E2).withValues(alpha: 0.5),
+                          color: Color(0xFF4A90E2).withValues(alpha: 0.5),
                           blurRadius: 8,
                           spreadRadius: 1,
                         ),
@@ -377,7 +377,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             Text(
               '  Stylist',
               style: TextStyle(
-                color: const Color(0xFF1A237E).withValues(alpha: 0.6),
+                color: Color(0xFF1A237E).withValues(alpha: 0.6),
                 fontSize: 14,
                 fontWeight: FontWeight.w300,
               ),
@@ -612,10 +612,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             gradient: LinearGradient(colors: [
-              const Color(0xFF1A237E).withValues(alpha: 0.4),
-              const Color(0xFF0D47A1).withValues(alpha: 0.3),
+              Color(0xFF1A237E).withValues(alpha: 0.4),
+              Color(0xFF0D47A1).withValues(alpha: 0.3),
             ]),
-            border: Border.all(color: const Color(0xFF42A5F5).withValues(alpha: 0.3)),
+            border: Border.all(color: Color(0xFF42A5F5).withValues(alpha: 0.3)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,10 +679,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           gradient: LinearGradient(colors: [
-            const Color(0xFF1B5E20).withValues(alpha: 0.4),
-            const Color(0xFF2E7D32).withValues(alpha: 0.3),
+            Color(0xFF1B5E20).withValues(alpha: 0.4),
+            Color(0xFF2E7D32).withValues(alpha: 0.3),
           ]),
-          border: Border.all(color: const Color(0xFF66BB6A).withValues(alpha: 0.3)),
+          border: Border.all(color: Color(0xFF66BB6A).withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -730,11 +730,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             gradient: LinearGradient(
               colors: [
                 Color.lerp(
-                  const Color(0xFF8B1538).withValues(alpha: 0.8),
-                  const Color(0xFFFF1744).withValues(alpha: 0.9),
+                  Color(0xFF8B1538).withValues(alpha: 0.8),
+                  Color(0xFFFF1744).withValues(alpha: 0.9),
                   _pulseCtrl.value,
                 )!,
-                const Color(0xFF4A148C).withValues(alpha: 0.9),
+                Color(0xFF4A148C).withValues(alpha: 0.9),
               ],
             ),
           ),
@@ -774,7 +774,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     Text(
                       'Speak naturally in any language • Tap mic to send',
                       style: TextStyle(
-                        color: const Color(0xFF1A237E).withValues(alpha: 0.6),
+                        color: Color(0xFF1A237E).withValues(alpha: 0.6),
                         fontSize: 11,
                       ),
                     ),
@@ -808,8 +808,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF1B5E20).withValues(alpha: 0.8),
-            const Color(0xFF004D40).withValues(alpha: 0.8),
+            Color(0xFF1B5E20).withValues(alpha: 0.8),
+            Color(0xFF004D40).withValues(alpha: 0.8),
           ],
         ),
       ),
@@ -856,7 +856,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF4A90E2).withValues(alpha: 0.4),
+                  color: Color(0xFF4A90E2).withValues(alpha: 0.4),
                   blurRadius: 24,
                   spreadRadius: 2,
                 ),
@@ -889,16 +889,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               borderRadius: BorderRadius.circular(24),
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF4A90E2).withValues(alpha: 0.15),
-                  const Color(0xFF1976D2).withValues(alpha: 0.1),
+                  Color(0xFF4A90E2).withValues(alpha: 0.15),
+                  Color(0xFF1976D2).withValues(alpha: 0.1),
                 ],
               ),
-              border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.4)),
+              border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.mic_rounded, color: const Color(0xFF4A90E2).withValues(alpha: 0.9), size: 22),
+                Icon(Icons.mic_rounded, color: Color(0xFF4A90E2).withValues(alpha: 0.9), size: 22),
                 const SizedBox(width: 10),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -909,7 +909,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                     ),
                     Text(
                       'Telugu • Hindi • English • Tinglish',
-                      style: TextStyle(color: const Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11),
+                      style: TextStyle(color: Color(0xFF1A237E).withValues(alpha: 0.6), fontSize: 11),
                     ),
                   ],
                 ),
@@ -945,12 +945,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           color: Color(0xFF4A90E2).withValues(alpha: 0.2),
-          border: Border.all(color: const Color(0xFF4A90E2).withValues(alpha: 0.2)),
+          border: Border.all(color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: const Color(0xFF1A237E).withValues(alpha: 0.7),
+            color: Color(0xFF1A237E).withValues(alpha: 0.7),
             fontSize: 13,
           ),
         ),
@@ -985,7 +985,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 boxShadow: [
                   BoxShadow(
                     color:
-                        const Color(0xFF4A90E2).withValues(alpha: 0.15),
+                        Color(0xFF4A90E2).withValues(alpha: 0.15),
                     blurRadius: 8,
                   ),
                 ],
@@ -1076,7 +1076,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       decoration: BoxDecoration(
-        color: const Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withValues(alpha: 0.9),
         border: Border(
           top: BorderSide(color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
         ),
@@ -1112,7 +1112,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF4A90E2).withValues(alpha: 0.4),
+                    color: Color(0xFF4A90E2).withValues(alpha: 0.4),
                     blurRadius: 12,
                     offset: const Offset(0, 3),
                   ),
@@ -1154,7 +1154,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                 BoxShadow(
                   color: _isRecording
                       ? Colors.red.withValues(alpha: 0.4 + 0.2 * _pulseCtrl.value)
-                      : const Color(0xFF4A90E2).withValues(alpha: 0.3),
+                      : Color(0xFF4A90E2).withValues(alpha: 0.3),
                   blurRadius: _isRecording ? 16 + 4 * _pulseCtrl.value : 12,
                   spreadRadius: _isRecording ? 2 : 1,
                 ),
@@ -1195,10 +1195,10 @@ class _ExpandableReasoningCardState extends State<_ExpandableReasoningCard> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: LinearGradient(colors: [
-          const Color(0xFF4A148C).withValues(alpha: 0.4),
-          const Color(0xFF6A1B9A).withValues(alpha: 0.3),
+          Color(0xFF4A148C).withValues(alpha: 0.4),
+          Color(0xFF6A1B9A).withValues(alpha: 0.3),
         ]),
-        border: Border.all(color: const Color(0xFFCE93D8).withValues(alpha: 0.3)),
+        border: Border.all(color: Color(0xFFCE93D8).withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

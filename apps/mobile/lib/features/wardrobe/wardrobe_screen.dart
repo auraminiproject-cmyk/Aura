@@ -83,12 +83,12 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
           const SizedBox(height: 16),
           Text('No saved outfits yet',
               style: TextStyle(
-                  color: const Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 17)),
+                  color: Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 17)),
           const SizedBox(height: 8),
           Text(
             'Finalize an outfit in Chat to save it here',
             style: TextStyle(
-                color: const Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 13),
+                color: Color(0xFF1A237E).withValues(alpha: 0.5), fontSize: 13),
           ),
         ],
       ),
@@ -134,7 +134,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
           ],
         ),
         border: Border.all(
-            color: const Color(0xFF4A90E2).withValues(alpha: 0.2)),
+            color: Color(0xFF4A90E2).withValues(alpha: 0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,14 +162,14 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                     children: [
                       Text(name,
                           style: const TextStyle(
-                            color: const Color(0xFF1A237E),
+                            color: Color(0xFF1A237E),
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                           )),
                       if (dateStr.isNotEmpty)
                         Text(dateStr,
                             style: TextStyle(
-                                color: const Color(0xFF1A237E).withValues(alpha: 0.5),
+                                color: Color(0xFF1A237E).withValues(alpha: 0.5),
                                 fontSize: 11)),
                     ],
                   ),
@@ -221,9 +221,9 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: const Colors.green.shade50,
+          color: Colors.green.shade50,
           border: Border.all(
-              color: const Color(0xFF66BB6A).withValues(alpha: 0.2)),
+              color: Color(0xFF66BB6A).withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,7 +251,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
                     .map((e) => Text(
                           '${e.key.replaceAll('_cut_cm', '').replaceAll('_', ' ')}: ${e.value}cm',
                           style: TextStyle(
-                              color: const Color(0xFF1A237E).withValues(alpha: 0.8),
+                              color: Color(0xFF1A237E).withValues(alpha: 0.8),
                               fontSize: 11,
                               fontFamily: 'monospace'),
                         ))
@@ -300,7 +300,7 @@ class _WardrobeScreenState extends ConsumerState<WardrobeScreen> {
           const SizedBox(width: 4),
           Text(text,
               style: TextStyle(
-                  color: const Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 11)),
+                  color: Color(0xFF1A237E).withValues(alpha: 0.8), fontSize: 11)),
         ],
       ),
     );
